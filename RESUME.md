@@ -6,17 +6,18 @@ Update after EVERY step. Keep short.
 Matter thermostat for a Daikin fancoil (EKWHCTRL/EKRTCTRL controllers, Modbus RTU). Knowledge in `Knowledgebase/wiki/` (agent-maintained), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`.
 
 ## Last step
-`/capture` of both N420384A PDFs done: 2 source pages, 5 concept pages, 4 entity pages in `Knowledgebase/wiki/` (text via pdftotext; diagrams not visually checked).
+Wiki ingest of both N420384A PDFs committed; repo pushed to `origin/main` (git@github.com:petertoth5/DaikinFancoilMatterThermostat.git, SSH). README rewritten.
 
 ## Status
-- Wiki populated; open source conflicts recorded in `concepts/modbus-rs485-link.md` (+AB- vs +BA-).
+- Wiki populated (2 sources, 5 concepts, 4 entities); open conflict: +AB- vs +BA- terminal label (`concepts/modbus-rs485-link.md`).
+- Wiki derived from `pdftotext`; diagrams/bit positions not visually verified.
 - No code yet. No agents defined yet.
-- Git: repo initialized, all staged, **not committed** (git user.name/email not configured on this machine; ask user).
+- Git clean and in sync with remote.
 
 ## Next
-1. Configure git identity, commit (suggested: "Add LLM wiki system and ingest N420384A Modbus manuals"), add remote, push.
-2. Optionally verify STAT/ALR_STAT bit positions against rendered PDF page 5.
-3. Define agents (user to specify), then decide hardware/firmware architecture from the wiki.
+1. Optionally verify STAT/ALR_STAT bit positions against rendered PDF page 5 (`pdftoppm` is installed).
+2. Define agents (user to specify).
+3. Decide hardware/firmware architecture from the wiki (Matter bridge to Modbus RTU).
 
 ## Start prompt (copy/paste into a fresh session)
 ```
