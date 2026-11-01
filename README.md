@@ -2,7 +2,7 @@
 
 A Matter thermostat for Daikin fancoils. It controls EKRTCTRL1 / EKWHCTRL1 wall controls (INN-FR-B32 board) over their Modbus RTU serial interface (RS485, 9600 8N1).
 
-**Status:** early stage. The Modbus documentation is ingested into the wiki; no firmware or code yet.
+**Status:** early stage. The Modbus documentation is ingested into the wiki; no firmware or code yet. Next: project goal, hardware and architecture brief from the user.
 
 ## Repository layout
 
