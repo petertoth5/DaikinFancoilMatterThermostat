@@ -6,7 +6,7 @@ Update after EVERY step. Keep short.
 Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M, joining the Daikin EKWHCTRL1 <-> INN-FR-B32 Modbus RTU bus without disturbing it. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`.
 
 ## Last step
-Dev env ready: ESP-IDF v6.0.2 at `~/esp/esp-idf-v6.0.2` (activate: `. ~/esp/esp-idf-v6.0.2/export.sh`), broken old install removed, skeleton `firmware/` builds for esp32s3. Wiki `concepts/dev-environment` updated. Then `/capture` of `raw/MAX485-M_EN_10035508.pdf` (chip datasheet: 5 V supply, RO 5 V-level vs ESP32-S3 3.3 V, pinout) into `sources/max485-datasheet`, `entities/max485`, `concepts/bus-topology`. `/sync` and `/lint` run, lint fixes applied; committed and pushed.
+Knowledge agents implemented in `.claude/agents/`: `wiki-keeper` (sole wiki writer) and `datasheet-reader` (read-only PDF fact extraction); `agents/README.md` updated. Previous work committed/pushed (ac91d77); committed and pushed.
 
 ## Status
 - Rules: ESP-IDF, esp32s3, components ONLY via IDF component manager from the ESP registry.
@@ -15,8 +15,9 @@ Dev env ready: ESP-IDF v6.0.2 at `~/esp/esp-idf-v6.0.2` (activate: `. ~/esp/esp-
 - Open: INN-FR-B32 location conflict (brief: in fancoil; manuals: in wall panel); +AB- vs +BA- terminal label; bus master/tap point and MAX485-M module details (datasheet covers the bare chip only; `concepts/bus-topology`, `entities/max485`).
 
 ## Next
-1. **Agent definition** in `.claude/agents/` (user's requested next step); identify new skills/rules in parallel.
-2. Later: `/brainstorming` for SW architecture (add `espressif/esp_matter` then); scheduling.
+1. Brainstorm and refine the development/architecture agents (candidates: hw-bus-reviewer, registry-guard, firmware-dev, build-verifier; maybe matter-architect), plus related skills/rules (registry-only rule, `idf-env` skill).
+2. Answer open questions (INN-FR-B32 location, bus master/tap point, MAX485-M module details); optionally have `datasheet-reader` verify STAT bit positions (manual PDF p5).
+3. Later: `/brainstorming` for SW architecture (add `espressif/esp_matter` then); scheduling.
 
 ## Start prompt (copy/paste into a fresh session)
 ```
