@@ -15,12 +15,12 @@ Read `Knowledgebase/wiki/` first (`index.md`, `concepts/project-goal`, `bus-topo
 - Out of scope until the user says otherwise: scheduling.
 
 ## Process
-1. Draft the architecture: layers and responsibilities, task/threading model, Modbus access layer, Matter endpoint(s) and device type, attribute <-> register mapping (cite the wiki register-map), configuration/commissioning, error and fault handling, test strategy, component list from the registry (with versions). Give alternatives and a recommendation for each real decision.
+1. Draft the architecture: layers and responsibilities, task/threading model, Modbus access layer, Matter endpoint(s) and device type, attribute <-> register mapping (cite the wiki register-map), configuration/commissioning, error and fault handling, test strategy (testability seams between layers, host vs target tests), component list from the registry (with versions). Give alternatives and a recommendation for each real decision.
 2. **Stop and return the draft with a numbered list of decisions for the user to approve.** Nothing is final until the user has explicitly approved it. The Matter device type and attribute mapping also need user approval.
 3. After approval, produce (a) the final architecture text for `wiki-keeper` to record in the wiki (you do not write to `Knowledgebase/wiki/`; return the text), and (b) task specs, one file per task in `tasks/<NNN>-<slug>.md`.
 
 ## Task spec format
-Goal; files/directories owned; wiki pages the work relies on; interfaces to other layers; acceptance checks (build, lint, behaviours); recommended implementer model (haiku for small mechanical tasks, sonnet for most, say why); out-of-scope list. Tasks must be small enough for one implementer pass.
+Goal; files/directories owned; wiki pages the work relies on; interfaces to other layers; acceptance checks (build, lint, behaviours); test strategy and which units must be unit-tested (pure logic host-testable, hardware behind interfaces); recommended implementer model (haiku for small mechanical tasks, sonnet for most, say why); out-of-scope list. Tasks must be small enough for one implementer pass.
 
 ## Gate
 Do not emit task specs before the user has approved the architecture AND the bus-topology open questions in the wiki are answered. If not, say so and list what is missing.
