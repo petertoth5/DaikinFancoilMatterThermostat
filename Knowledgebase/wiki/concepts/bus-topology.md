@@ -11,6 +11,9 @@ updated: 2026-11-02
 
 Link rules that apply to the extra node: 9600 8N1, 120 Ω termination, no star topology, own address ([[concepts/modbus-rs485-link]], [[concepts/device-addressing]]).
 
+## User decisions (session 2026-11-02, stated by the user; not in raw)
+- The new node shall be a **second master** (poll and write) on the bus. Risk: Modbus RTU normally has one master (inferred); whether EKWHCTRL1 is the current master is unverified, so arbitration/timing and a safe fallback must be designed explicitly.
+
 ## Open questions
 0. **Conflict:** the brief places the INN-FR-B32 "in the fancoil"; the Daikin manuals describe it as the board inside the wall controls ([[entities/inn-fr-b32]]). Which is physically on the bus?
 1. Which device is the bus master today (EKWHCTRL1 towards the fancoil)? Is the EKWHCTRL1↔INN-FR-B32 link the same bus as the "+ A B -" Modbus port, or the separate "A A B B -" port ([[entities/ekwhctrl1]])? Wiring (where exactly the new node taps in) depends on it.

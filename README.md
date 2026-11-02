@@ -2,7 +2,7 @@
 
 A Matter thermostat for Daikin fancoils. It controls EKRTCTRL1 / EKWHCTRL1 wall controls (INN-FR-B32 board) over their Modbus RTU serial interface (RS485, 9600 8N1).
 
-**Status:** early stage. Project brief and Modbus documentation are in the wiki; no firmware yet. Target: ESP32-S3 (ESP-IDF, components only from the ESP component registry via the IDF component manager). Dev environment ready; next: agent definition.
+**Status:** early stage. Project brief and Modbus documentation are in the wiki; no firmware yet. Target: ESP32-S3 (ESP-IDF, components only from the ESP component registry via the IDF component manager). Dev environment ready; agents defined (orchestrator is the default agent, see `.claude/agents/README.md`); next: answer bus-topology questions, then architecture.
 
 ## Repository layout
 

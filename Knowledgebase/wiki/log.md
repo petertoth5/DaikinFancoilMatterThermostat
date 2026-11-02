@@ -28,3 +28,6 @@ Findings: 5 V supply; RO output 5 V level vs ESP32-S3 3.3 V (level shift, inferr
 
 ## [2026-11-02] lint | fixes applied
 Recorded INN-FR-B32 location conflict (brief: in fancoil vs manuals: in wall panels) on entities/inn-fr-b32 and concepts/bus-topology; marked bus-termination assumption (inferred); refreshed `updated` on 3 pages; completed `sources:` on esp32-s3-wroom-1 and bus-topology. No contradictions otherwise; external registry/local-install facts left as flagged.
+
+## [2026-11-02] sync | user decisions recorded
+Second-master decision (bus-topology), Matter-mapping approval and development gate (project-goal), both from user statements in the session, not raw.
