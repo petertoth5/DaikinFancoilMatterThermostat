@@ -2,7 +2,7 @@
 title: Modbus RTU / RS485 link
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 
 # Modbus RTU / RS485 link
@@ -16,3 +16,5 @@ updated: 2026-11-01
 **Conflict/gap – 500 m/50 units:** missing from file 2; treat as valid but unconfirmed there.
 
 Devices: [[entities/ekrtctrl1]], [[entities/ekwhctrl1]], [[entities/inn-fr-b32]]. Addressing: [[concepts/device-addressing]]. Registers: [[concepts/register-map]].
+
+New third node planned on this bus: [[concepts/bus-topology]].
