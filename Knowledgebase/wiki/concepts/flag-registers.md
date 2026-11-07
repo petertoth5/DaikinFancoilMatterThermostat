@@ -2,22 +2,73 @@
 title: Status and configuration flag registers
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-01
+updated: 2026-11-07
 ---
 
-# Flag registers (p5)
+# Flag registers (p4 table, p5 bits)
 
-## PRG – reg 201 (R/W)
-Bits 0–2 PRG mode: 000 Automatic, 001 Silent, 010 Night, 011 Maximum. Bit 4 LOCK: 1 = keyboard disabled locally. Bit 7 Stby: 1 = standby. Bits 8–15 reserved, do not change.
+Bit tables and the p4 register rows were **visually verified** by `datasheet-reader` (PDF pages read as images) in [[sources/n420384a-english]] and [[sources/n420384a-modbus-rtu]]; p5 is identical in both files.
 
-## OUT – reg 009 (R)
-Bit 0 EV1, bit 1 EV2, bit 2 CHILLER, bit 3 BOILER (relay outputs).
+## Register rows (p4)
+| Reg | Name | R/W | Default |
+|---|---|---|---|
+| 009* | OUT | R | – |
+| 104* | STAT | R | – |
+| 105 | ALR_STAT | R | – |
+| 201 | PRG | R/W | 0 |
 
-## STAT – reg 104 (R)
-Bit 0 cooling mode active, bit 1 heating mode active (label "Mod. Raff./Risc."; order per layout *(inferred)*). Bit 4 F.V. H2 (fan stop, water unsuitable on H2), bit 5 F.V. H4, bit 6 B.A. (stop for unsuitable water, standby 45 min), bit 8 antifreeze, bit 9 alarm present, bit 10 test mode, bit 11 standby, bit 12 Com err (master timeout 300 s), bit 13 H2 absent at start, bit 14 H4 absent at start.
-Bit positions are read from the PDF diagram text layout and should be verified against the original page.
+Footnote: "* Only for INN-FR-B32 board" → OUT and STAT exist only on [[entities/inn-fr-b32]] (p4). **Open:** are they readable in other setups / in this installation? Relevant because the new node wants to follow status ([[concepts/bus-topology]]).
 
-## ALR_STAT – reg 105 (R)
-Com (blind-version comms error), AIR probe, H4 probe, Acq. Dan. (harmful water block), H2 probe, H4 not suitable, Hi Res (high temperature resistance), Mot (motor fault), GRID contact open, H2 not suitable, Filter (maintenance), "2 AIR M4/M5" (comms error with remote-probe fancoil or more than one board with air probe; E2 shown).
+## PRG – reg 201 (R/W) (p5)
+Bits 0–2 PRG mode: 000 Automatic (source typo "Sutomatic"), 001 Silent, 010 Night, 011 Maximum; values 100–111 undefined. Bit 4 LOCK: 1 = keyboard disabled locally. Bit 7 Stby: 1 = standby. Bits 3, 5, 6 shown as "-" (undocumented). Bits 8–15 reserved, do not change.
 
-See [[concepts/register-map]]; source [[sources/n420384a-english]].
+## OUT – reg 009 (R) (p5)
+Only bits 7–0 are shown: bit 0 EV1, bit 1 EV2, bit 2 CHILLER, bit 3 BOILER (relay outputs); no meaning reported for bits 4–7. Bits 8–15 are not shown.
+
+## STAT – reg 104 (R) (p5, bit positions visually verified)
+| Bit | Label | Meaning (legend) |
+|---|---|---|
+| 15 | "0" | – |
+| 14 | H4 asnt | H4 absent at start |
+| 13 | H2 asnt | H2 absent at start |
+| 12 | Com err. | "Timeout master (vers. Centralised B32) of 300sec" |
+| 11 | stby | standby |
+| 10 | test | test mode |
+| 9 | alrm | alarm present |
+| 8 | Antig | antifreeze |
+| 7 | "0" | – |
+| 6 | B.A. | stop for unsuitable water, standby 45 min |
+| 5 | F.V. H4 | fan stop, water unsuitable on H4 |
+| 4 | F.V. H2 | fan stop, water unsuitable on H2 |
+| 3 | (empty) | – |
+| 2 | (empty) | – |
+| 1 | Mod. Risc. | active mode: heating *(Italian reading, inferred)* |
+| 0 | Mod. Raff. | active mode: cooling *(Italian reading, inferred)* |
+
+Label nuance: the table cells read "Mod. Risc." / "Mod. Raff."; the legend reads "Mod. Risc./Mod. Rafr: Active mode".
+**Bus-design relevance:** bit 12 flags a **300 s master timeout** (see [[concepts/bus-topology]]).
+
+## ALR_STAT – reg 105 (R) (p5)
+| Bit | Table label | Legend / note |
+|---|---|---|
+| 15–12 | "0" | – |
+| 11 | 2 AIR M5 | legend: "2 AIR M4 (only for M4 control panel)" — **conflict** |
+| 10 | Filter | legend: "Filtro" (language only); maintenance |
+| 9 | H2 n. id | H2 not suitable |
+| 8 | SW GRL | legend: "GRID: GRID contact open" — **conflict** |
+| 7 | Mot | motor fault |
+| 6 | Hi Res | high temperature resistance |
+| 5 | H4 n. id | H4 not suitable |
+| 4 | H2 | H2 probe |
+| 3 | Acq. Dan. | harmful water block |
+| 2 | H4 | H4 probe |
+| 1 | AIR | AIR probe |
+| 0 | Com | comms error (blind version) |
+
+**Conflicts table vs legend (recorded, not resolved):** bit 8 "SW GRL" vs "GRID"; bit 11 "2 AIR M5" vs "2 AIR M4"; bit 10 Filter/Filtro is a language difference only. Legend for bit 11 (visually verified by `datasheet-reader`, p5): "2 AIR M4 (only for M4 control panel): Communication error with fancoil with remote air probe or presence of more than one board with air probe ('E2' displayed)".
+
+## Open
+- What reserved / "-" / "0" bits read back as (not documented).
+- OUT/STAT availability outside INN-FR-B32 (see above).
+
+See [[concepts/register-map]]; sources [[sources/n420384a-english]], [[sources/n420384a-modbus-rtu]].

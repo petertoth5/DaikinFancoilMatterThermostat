@@ -2,7 +2,7 @@
 title: Project goal and scope
 type: concept
 sources: ["project-brief.md"]
-updated: 2026-11-02
+updated: 2026-11-07
 ---
 
 # Project goal and scope
@@ -12,7 +12,8 @@ Build a **Matter thermostat over Wi-Fi** on an ESP32-S3 that talks Modbus RTU to
 - Must be discoverable by any Matter controller/hub (examples named: Aeotec SmartThings hub, Apple TV 4K).
 - Hardware: [[entities/esp32-s3-wroom-1]], [[entities/max485]]; bus: [[concepts/bus-topology]].
 - Tooling: [[concepts/dev-environment]].
-- **In scope now:** dev environment, agent definition (next step). **Deferred:** SW architecture/layers (brainstorm later), scheduling.
+- **Done:** dev environment ([[concepts/dev-environment]]), agent definition (`.claude/agents/`). **Deferred:** SW architecture/layers (brainstorm later), scheduling.
+- **Node role:** passive monitor; master only on Matter-originated commands (user statement, 2026-11-07), see [[concepts/bus-topology]].
 - Daikin protocol reference: [[concepts/modbus-rs485-link]], [[concepts/register-map]].
 
 ## Decisions (user, session 2026-11-02; not in raw)

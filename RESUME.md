@@ -3,25 +3,22 @@
 Update after EVERY step. Keep short.
 
 ## Project
-Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M, joining the Daikin EKWHCTRL1 <-> INN-FR-B32 Modbus RTU bus (new node = **second master**) without disturbing it. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
+Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, joining the Daikin EKWHCTRL1 <-> fancoil Modbus RTU bus. Role (user, 2026-11-07): **passive monitor by default, master (FC06 writes/polls) only on Matter-originated commands**. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
 
-## Done so far
-- Wiki: 2 Daikin Modbus manuals, project brief, MAX485 chip datasheet ingested; sync + lint clean (fixes applied).
-- Dev env: ESP-IDF v6.0.2 at `~/esp/esp-idf-v6.0.2` (activate: `. ~/esp/esp-idf-v6.0.2/export.sh`); skeleton `firmware/` builds for esp32s3 (components only from the ESP registry via IDF component manager).
-- Agents in `.claude/agents/` (default agent = `orchestrator`, set in `.claude/settings.json`): `orchestrator` (opus, routes all work, can run single steps), `wiki-keeper` (sole wiki writer), `datasheet-reader` (read-only PDF facts), `architect` (opus; design needs user approval, then task specs in `tasks/`), `firmware-dev` (sonnet/haiku; readable, testable code + unit tests), `build-verifier` (haiku), `firmware-reviewer` (sonnet, independent). `hw-bus-reviewer` undecided.
-- Everything committed and pushed to `origin/main` (git clean).
+## Last step (2026-11-07)
+Lint fixes applied (H1, H2, M1–M7, L1–L4) from a `datasheet-reader` visual check of the Daikin manuals: EKWHCTRL1 "+ A B -" = serial connection for fancoil, "A A B B -" = Modbus RTU port (wiki had them reversed; user wiring agrees with the manual); INN-FR-B32 = fancoil PCB (location resolved). Wiki check: 0 broken links, 0 orphans. Not committed yet.
 
 ## Status / gates
-- No task specs/firmware work before: architecture approved by user AND bus-topology questions answered.
-- Not yet exercised: no agent has been run; no `tasks/` dir yet. Orchestrator default applies on a NEW session start.
-- Flashing path (usbipd vs Windows) deferred: no board attached.
-- Out of scope now: scheduling.
-- Open questions (wiki `concepts/bus-topology`, `entities/max485`): INN-FR-B32 location (brief: in fancoil; manuals: in wall panel); who is master today and where the node taps in; MAX485-M bare chip or module (termination, 5 V vs 3.3 V RX level shift, DE/RE); terminal label +AB- vs +BA-; STAT bit positions unverified (manual PDF p5, `datasheet-reader`).
+- Dev env: ESP-IDF v6.0.2 (`. ~/esp/esp-idf-v6.0.2/export.sh`); `firmware/` skeleton builds (registry components only).
+- No task specs/firmware before the architecture is approved by the user.
+- Gate: user decides whether the remaining open items block the architecture draft (they mostly affect hardware/wiring).
+- Open items (wiki `concepts/bus-topology`, `entities/ekwhctrl1`, `entities/max485`, `concepts/flag-registers`): is the "+ A B -" fancoil link Modbus RTU 9600 8N1 (sniff); who is master there; tap point "+ A B -" (user's wiring) vs unused EKWHCTRL1 Modbus port "A A B B -" (design decision); existing bus termination + 120 Ω placement (measure on-site); Daikin A/B vs MAX485 A/B mapping; module U1 marking, supply voltage, bias resistors, RO 5 V level shift, R7 role; OUT/STAT readability; ALR_STAT label conflicts (bit 8, bit 11); p3 "CP" label on "A A B B -".
+- Flashing path (usbipd vs Windows) deferred; scheduling out of scope.
 
 ## Next
-1. Orchestrator asks the user the bus-topology questions; `wiki-keeper` records answers (optional: `datasheet-reader` verifies STAT bits; user may add MAX485-M module doc and ESP32-S3 datasheet to `raw/` -> capture).
-2. Brainstorm SW architecture (`/brainstorming`) via `architect`: layers, second-master arbitration, Modbus<->Matter mapping (add `espressif/esp_matter`), test strategy. User approves -> `wiki-keeper` records -> task specs.
-3. Implement per spec: `firmware-dev` -> `build-verifier` + `firmware-reviewer`. Decide on `hw-bus-reviewer` later.
+1. Commit + push the wiki update (orchestrator).
+2. Step 2: `architect` brainstorms the architecture (passive monitor + Matter-triggered master, tap-point choice, arbitration/bus-idle detection, 300 s master-timeout note, Modbus<->Matter mapping, `espressif/esp_matter`, test strategy) for user approval -> `wiki-keeper` records -> task specs in `tasks/`.
+3. Implement per spec: `firmware-dev` -> `build-verifier` + `firmware-reviewer`.
 
 ## Start prompt (copy/paste into a fresh session in this repo; orchestrator is the default agent, else run `claude --agent orchestrator`)
 ```

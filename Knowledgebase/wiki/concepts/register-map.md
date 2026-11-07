@@ -2,12 +2,12 @@
 title: Modbus register map
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-01
+updated: 2026-11-07
 ---
 
 # Register map
 
-Source: [[sources/n420384a-english]] p4 (identical in [[sources/n420384a-modbus-rtu]]). Addresses are decimal. "mlt" = multiplier: raw × mlt = value (0.1 → tenths of unit). Limits must be respected. `*` = only on [[entities/inn-fr-b32]] board.
+Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-modbus-rtu]]; wording differences listed on that source page). Addresses are decimal. "mlt" = multiplier: raw × mlt = value (0.1 → tenths of unit). Limits must be respected. `*` = only on [[entities/inn-fr-b32]] board.
 
 | Reg | Name | Range | Description | R/W | mlt | Default |
 |---|---|---|---|---|---|---|

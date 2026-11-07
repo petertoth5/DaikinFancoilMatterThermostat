@@ -2,7 +2,7 @@
 title: MAX481/483/485/487-491/1487 datasheet (Maxim, via Hestore)
 type: source
 sources: ["MAX485-M_EN_10035508.pdf"]
-updated: 2026-11-02
+updated: 2026-11-07
 ---
 
 # MAX485 family datasheet
@@ -18,8 +18,8 @@ Raw: `MAX485-M_EN_10035508.pdf` — 18 PDF pages: page 1 is a Hestore cover, pag
 - Bus pins A/B abs. max -8 V to +12.5 V (p2).
 - Pinout, 8-pin DIP/SO: 1 RO, 2 /RE, 3 DE, 4 DI, 5 GND, 6 A (non-inverting), 7 B (inverting), 8 V_CC (p7, Fig. 1).
 - Direction control: DE high enables the driver (DI high → Y/A high); /RE low enables the receiver. Tie DE and /RE together for send/receive switching (inferred from Tables 1-2, p10). Driver enable/disable ≈ 40-70 ns (p3).
-- Applications (p13): terminate the line with **120 Ω at both ends**, keep stubs as short as possible; standard covers up to 4000 ft.
+- Applications (p13): the line is terminated at both ends in its characteristic impedance (the **120 Ω** value is from the figures); keep stubs as short as possible; standard covers up to 4000 ft.
 - Driver has foldback current limit and thermal shutdown (p11).
 
 ## Related
-[[entities/max485]], [[concepts/bus-topology]], [[concepts/modbus-rs485-link]].
+[[entities/max485]], [[concepts/bus-topology]], [[concepts/modbus-rs485-link]]. Module board photo: [[sources/max485-module-photo]].
