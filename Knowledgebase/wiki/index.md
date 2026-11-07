@@ -12,11 +12,12 @@ Catalog of all wiki pages. Maintained by the agent; see root `CLAUDE.md`.
 ## Concepts
 - [project-goal](concepts/project-goal.md) — Matter-over-Wi-Fi thermostat scope, deferred items
 - [bus-topology](concepts/bus-topology.md) — planned third node: passive monitor + Matter-triggered master, fancoil on "+ A B -"; open: Modbus on that link, master, tap point, termination, A/B mapping
-- [dev-environment](concepts/dev-environment.md) — ESP-IDF + component-registry-only rule, host state
+- [dev-environment](concepts/dev-environment.md) — ESP-IDF + component-registry-only rule, host state, approved components (esp-modbus ==2.1.4, esp_matter ^1.6.1)
 - [modbus-rs485-link](concepts/modbus-rs485-link.md) — 9600 8N1, FC 03/06, cable/termination rules, EKRTCTRL1 +AB-/+BA- legend conflict; EKWHCTRL1 "+ A B -" (no conflict)
 - [register-map](concepts/register-map.md) — full register table with ranges, defaults, quirks
 - [flag-registers](concepts/flag-registers.md) — PRG, OUT, STAT, ALR_STAT bit tables (visually verified), label conflicts
 - [web-restriction-flags](concepts/web-restriction-flags.md) — reg 247 supervisor lock/restriction flags, troubleshooting
+- [firmware-architecture](concepts/firmware-architecture.md) — approved architecture (user, 2026-11-07): P1 sniffer / P2 Matter mirror / P3 guarded TX, layers, zero-TX rules, Matter mapping, D1–D15
 - [device-addressing](concepts/device-addressing.md) — address 1–255, keypad procedure
 
 ## Entities

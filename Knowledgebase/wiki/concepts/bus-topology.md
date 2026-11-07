@@ -27,6 +27,9 @@ Link rules that apply to the extra node: 9600 8N1, no star topology, own address
 - **Existing bus termination:** "The bus currently works, but I do not know yet if there is 120 Ω termination on it or not. This has to be measured as soon as I'll have access to the fan coil again. Keep this open." → open item 3.
 - **Fancoil port:** the user checked: the fancoil pair is physically on the EKWHCTRL1 **"+ A B -"** block → item 1a answered. (The "manual conflict" shown to the user came from a wiki misreading of p3; the manual agrees, see 1a.)
 
+## Firmware plan (user decision 2026-11-07, not in raw)
+The node's role is implemented in phases ([[concepts/firmware-architecture]]): P1 RX-only sniffer (DE and /RE to GND, no TX code) measures open items **1, 1b, 4, 5** below; items **3/3a** are checked in the P1 bring-up checklist (`tasks/008` -> `docs/p1-bringup/`); P2 read-only Matter mirror; P3 guarded Matter-triggered writes (outline for item 2: idle windows learned in P1, pacing, readback, latching kill switch), specified only after the P1 data. Tap point for TX (item 6): listen on "+ A B -" first, decide after P1 (D1).
+
 ## Open questions
 **Answered**
 - Q1 tap point: "+ A B -" block of EKWHCTRL1 (user, 2026-11-07); fancoil pair confirmed on that block (item 1a below). Alternative tap point: see open item 6.
