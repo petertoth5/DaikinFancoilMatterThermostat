@@ -1,0 +1,114 @@
+menu "Daikin bus (phase 1 read probe)"
+
+    config DMT_BUS_UART_PORT
+        int "Bus UART port number"
+        range 1 2
+        default 1
+        help
+            UART used for the RS485 bus. UART0 stays the console.
+            Source: firmware-architecture, section 4 (hardware wiring).
+
+    config DMT_BUS_TX_GPIO
+        int "Bus UART TX GPIO (to MAX485 DI)"
+        range 0 48
+        default 5
+        help
+            Placeholder, to be confirmed during the on-site bring-up (task 008).
+
+    config DMT_BUS_RX_GPIO
+        int "Bus UART RX GPIO (from MAX485 RO)"
+        range 0 48
+        default 4
+        help
+            Placeholder, to be confirmed during the on-site bring-up (task 008).
+
+    config DMT_BUS_DE_GPIO
+        int "Bus UART RTS GPIO (MAX485 DE and /RE, tied)"
+        range 0 48
+        default 6
+        help
+            The UART RTS signal on this GPIO drives MAX485 DE and /RE (tied together).
+            A 10 kOhm pull-down keeps the transceiver in receive while the driver is
+            not running (firmware-architecture Q1, D8). Placeholder GPIO.
+
+    config DMT_BUS_BAUD
+        int "Bus baud rate (8N1 fixed)"
+        range 1200 115200
+        default 9600
+        help
+            9600 8N1 per wiki modbus-rs485-link. Changeable only because probe item 1
+            (bus parameters) is still unverified on site.
+
+    config DMT_BUS_SLAVE_ADDR
+        int "Default slave address"
+        range 1 247
+        default 1
+        help
+            Wiki register 200 (ADR) default is 1. The console can override it in RAM
+            (Q6). Upper bound 247 is the Modbus serial-line limit (D19, D21); the
+            EKWHCTRL1 manual says 1-255, a recorded conflict. Do not widen.
+
+    config DMT_BUS_GAP_MS
+        int "Minimum idle time between our transactions (ms)"
+        range 50 1000
+        default 100
+        help
+            Safety cap, not a tuning hint (Q3, D16).
+
+    config DMT_BUS_RESP_TIMEOUT_MS
+        int "Response timeout (ms)"
+        range 200 2000
+        default 500
+        help
+            Safety cap, not a tuning hint (Q3, D16).
+
+    config DMT_POLL_FAST_S
+        int "Fast poll group period (s)"
+        range 2 60
+        default 5
+        help
+            Safety cap, not a tuning hint (Q3, D6).
+
+    config DMT_POLL_SLOW_S
+        int "Slow poll group period (s)"
+        range 10 3600
+        default 60
+        help
+            Safety cap, not a tuning hint (Q3, D6).
+
+    config DMT_BUS_READ_RETRIES
+        int "Read retries per transaction"
+        range 0 1
+        default 1
+        help
+            Retries on timeout or CRC error only, never on an exception (Q3, D21).
+            Capped at 1.
+
+    config DMT_BUS_OFFLINE_AFTER
+        int "Consecutive failures before OFFLINE"
+        range 2 20
+        default 5
+        help
+            Health state machine threshold (Q3, D21).
+
+    config DMT_BUS_OFFLINE_PROBE_S
+        int "OFFLINE probe period (s)"
+        range 10 600
+        default 30
+        help
+            While OFFLINE only register 000 is read at this period (Q3, D21).
+
+    config DMT_BUS_BOOT_SILENCE_MS
+        int "Boot silence check duration (ms)"
+        range 1000 60000
+        default 5000
+        help
+            Receive-only listening before the master may transmit (Q4, D17).
+
+    config DMT_BUS_WRITE
+        bool "Enable bus writes (phase 3)"
+        default n
+        help
+            Not implemented before phase 3. Selecting it fails the build.
+
+endmenu

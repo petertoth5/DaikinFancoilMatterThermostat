@@ -9,8 +9,8 @@ Written by `architect` from architecture **v0.3**, approved by the user on 2026-
 ## Order (phase 1)
 | # | Task | Depends on | Model | Bus-touching | Status |
 |---|---|---|---|---|---|
-| 001 | [Skeleton, Kconfig, bus-access lint, host-test runner](001-skeleton-kconfig-lint.md) | - | sonnet | yes (lint) | spec ready |
-| 009 | [`daikin_regs` register table, scaling, whitelists](009-daikin-regs.md) | 001 | sonnet | yes (read whitelist) | spec ready |
+| 001 | [Skeleton, Kconfig, bus-access lint, host-test runner](001-skeleton-kconfig-lint.md) | - | sonnet | yes (lint) | done (implemented and accepted 2026-11-09: firmware-reviewer accept after two rounds, build-verifier all checks pass) |
+| 009 | [`daikin_regs` register table, scaling, whitelists](009-daikin-regs.md) | 001 | sonnet | yes (read whitelist) | next |
 | 010 | [`reg_model` + `poll_sched`, health, `txn_log`](010-reg-model-poll-sched.md) | 009 | sonnet | yes (pacing) | spec ready |
 | 002 | [esp-modbus `==2.1.4` master spike, `rs485_port`, `mb_link` read, ELF check](002-esp-modbus-master-spike-mb-link.md) | 001, 009 | sonnet | yes | spec ready |
 | 006 | [`bus_task` poll loop, probe console, `app_main`](006-bus-task-console.md) | 002, 010 | sonnet | yes | spec ready |

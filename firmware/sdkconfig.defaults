@@ -1,0 +1,4 @@
+# ISR in IRAM keeps UART reception working during flash operations (kept from v0.2, user 2026-11-09).
+CONFIG_UART_ISR_IN_IRAM=y
+# Phase 3 write gate: must stay off in phase 1 (the build fails otherwise).
+CONFIG_DMT_BUS_WRITE=n

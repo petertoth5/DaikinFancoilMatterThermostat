@@ -1,6 +1,7 @@
 # 001 - Firmware skeleton, Kconfig, bus-access lint, host-test runner
 
-Phase: 1 (on-site read probe). Status: spec ready (v0.3, 2026-11-08). Depends on: nothing.
+Phase: 1 (on-site read probe). Status: done (implemented and accepted 2026-11-09: firmware-reviewer accept after two rounds, build-verifier all checks pass). Depends on: nothing.
+Amended 2026-11-09 after review: `firmware-reviewer` found lint bypasses; the orchestrator approved the fixes (stricter than or clarifying v0.3): scanned suffixes, exact skip-directory names, R8 compound assignments, continuation splicing, documented lint limits, extra self-test cases, `firmware/.gitignore`, README notes.
 Review: `firmware-reviewer` reviews this task independently (the lint is a bus-safety control).
 
 ## Goal
@@ -22,7 +23,8 @@ The bus components (`mb_link`, `rs485_port`, ...) do not exist yet. The lint rul
 - `firmware/components/README.md` (new: per-component rules: `-Wall -Wextra -Werror`, host tests in `test_host/test_*.c`)
 - `firmware/tools/check_bus_access.py` (new)
 - `firmware/test/host/` (new: `CMakeLists.txt`, `sdkconfig.defaults`, `main/CMakeLists.txt`, `main/test_main.c`, `main/test_smoke.c`)
-- `firmware/README.md` (new: build, lint, host-test commands)
+- `firmware/README.md` (new: build, lint, host-test commands; notes: re-run `idf.py reconfigure` in `test/host/` after adding a `test_*.c` (the GLOB is evaluated at configure time); the `linux` host target needs `libbsd-dev` (`sudo apt install libbsd-dev`); `esp-clang` is not installed)
+- `firmware/.gitignore` (new, amended 2026-11-09: `build*/` and `__pycache__/`)
 
 Do not change `main/main.c` behaviour (owned by 006). No new dependencies.
 
@@ -60,7 +62,9 @@ Do not change `main/main.c` behaviour (owned by 006). No new dependencies.
 `CONFIG_UART_ISR_IN_IRAM=y` (kept from v0.2; answers the wiki section-8 note; user-approved 2026-11-09); `CONFIG_DMT_BUS_WRITE=n`. Verify the IRAM symbol name in IDF v6.0.2 (`esp_driver_uart` Kconfig); if it differs, use the real one and report it.
 
 ### Bus-access lint (`tools/check_bus_access.py`)
-Python 3 stdlib only. Scans `*.c *.h *.cpp` under `firmware/main/` and `firmware/components/`; skips `managed_components/`, `build*/`, `test/`, and every `test_host/` directory. Comments and strings are not exempt. Output on violation: `path:line: R<n>: <message>`, exit 1. Paths below are relative to `firmware/`.
+Python 3 stdlib only. Scans files with suffix `.c .h .cpp .cc .cxx .hpp .hh .S` under `firmware/main/` and `firmware/components/` (amended 2026-11-09; was `.c/.h/.cpp`). Skips `managed_components/` and, below `main/` and `components/`, only directories whose name is exactly `test_host`, `build`, or matches `build-*` / `build_*` (amended 2026-11-09: no generic `test` skip, no prefix match on `build`, so e.g. `test/`, `builder/`, `buildx/` are scanned). Comments and strings are not exempt. Backslash-newline continuations are spliced before matching (reported line numbers refer to the original file).
+
+Known limits (out of scope, documented in the script's docstring): `#include MACRO` (macro-expanded include names), `##` token pasting, and for R8 positional initializers, aliases/pointers to the field and values via macros or variables. R8 is a heuristic; the real guard is FC06 existing only in `WRITE_FILE` (compiled only with the gate on) plus the task-002 ELF check. Output on violation: `path:line: R<n>: <message>`, exit 1. Paths below are relative to `firmware/`.
 
 Rules implement architecture section 3 "Compile-time gate and bus-access lint (D10, D20)"; where a rule is stricter than the wiki wording it says so (the stricter R1, R4, R5 are user-approved 2026-11-09). `WRITE_FILE` = `components/mb_link/src/mb_link_write.c` (does not exist in phase 1; compiled only with the gate on, phase 3).
 
@@ -73,9 +77,9 @@ Rules implement architecture section 3 "Compile-time gate and bus-access lint (D
 | R5 | `\b(uart_set_pin|uart_set_mode|uart_driver_install|uart_driver_delete|uart_param_config|uart_read_bytes)\b` only in `components/rs485_port/` (stricter: not in `mb_link`). Each `uart_set_mode(` call's 2nd argument must be literally `UART_MODE_RS485_HALF_DUPLEX` or `UART_MODE_UART` (argument parsing may join lines up to the closing parenthesis). |
 | R6 | `CONFIG_DMT_BUS_(TX|DE)_GPIO` only in `components/rs485_port/` and `main/`. |
 | R7 | `\bmb_link_write\w*` only in `WRITE_FILE` and `components/mb_link/include/mb_link_write.h` (neither exists in phase 1). |
-| R8 | In `components/` outside `WRITE_FILE`: `\bMB_FUNC_WRITE\w*` fails; in `components/mb_link/` outside `WRITE_FILE` every assignment to a `command` field (`\.command\s*=` or `command\s*=`) must have the literal value `0x03` or `MB_FUNC_READ_HOLDING_REGISTER` (FC06 constant only in `WRITE_FILE`). |
+| R8 | In `components/` outside `WRITE_FILE`: `\bMB_FUNC_WRITE\w*` fails; in `components/mb_link/` outside `WRITE_FILE` every assignment to a `command` field (`\.command\s*=` or `command\s*=`; amended 2026-11-09: any compound assignment `|= &= ^= += -= *= /= %= <<= >>=` to it fails outright) must have the literal value `0x03` or `MB_FUNC_READ_HOLDING_REGISTER` (FC06 constant only in `WRITE_FILE`). |
 
-`--self-test`: built-in `(virtual_path, snippet)` cases, at least one violating case per rule and per allowed-name exception, plus good cases (e.g. `mbc_master_send_request` in `components/mb_link/src/mb_link.c`; `uart_set_mode(p, UART_MODE_RS485_HALF_DUPLEX)` in `components/rs485_port/src/rs485_port.c`; `.command = 0x03` in `components/mb_link/src/mb_link.c`; `mb_link_write` and `.command = 0x06` in `WRITE_FILE`). Exit 0 only if every bad case reports exactly its rule and every good case passes.
+`--self-test`: built-in `(virtual_path, snippet)` cases, at least one violating case per rule and per allowed-name exception, plus good cases (e.g. `mbc_master_send_request` in `components/mb_link/src/mb_link.c`; `uart_set_mode(p, UART_MODE_RS485_HALF_DUPLEX)` in `components/rs485_port/src/rs485_port.c`; `.command = 0x03` in `components/mb_link/src/mb_link.c`; `mb_link_write` and `.command = 0x06` in `WRITE_FILE`). Amended 2026-11-09, must also cover: a forbidden name inside a comment and inside a string literal (both still fail); R8 compound assignment (e.g. `req.command |= 0x06;`); a multi-line `uart_set_mode(` call with a bad 2nd argument (incl. one split by backslash-newline); a walker test on a temporary directory (`tempfile`) asserting that `test_host/`, `build/`, `build-x/`, `build_x/`, `managed_components/` are skipped, that `test/`, `builder/` are scanned, and that `.cc .cxx .hpp .hh .S` files are scanned. Exit 0 only if every bad case reports exactly its rule and every good case passes.
 
 Build hook in `firmware/CMakeLists.txt` after `project()`: one custom target `bus_access_lint` that runs `${PYTHON} tools/check_bus_access.py --self-test` and then `${PYTHON} tools/check_bus_access.py`, made a dependency of `${CMAKE_PROJECT_NAME}.elf`. Either failing fails `idf.py build`.
 
@@ -109,3 +113,6 @@ sonnet: IDF CMake custom-target wiring, the linux host project and eight precise
 - Any UART, Modbus, Matter, Wi-Fi, NVS code; `main.c` behaviour.
 - Adding `espressif/esp-modbus` (002) or `espressif/esp_matter` (phase 2).
 - The ELF check (002). CI. clang-tidy (report whether `esp-clang` is installed; do not install it).
+
+## Follow-ups
+- `--self-test` lacks explicit cases for the R8 compound operators `^= -= *= /= %= >>=` (the lint already rejects them); add the cases in a later small change.
