@@ -1,71 +1,72 @@
-# 006 - `bus_task` glue, diagnostics console, `app_main`
+# 006 - `bus_task` poll loop, probe console (`mb ...`), `app_main`
 
-Phase: P1. Status: spec ready. Depends on: 003, 004, 005.
+Phase: 1. Status: spec ready (v0.3, 2026-11-08; amended 2026-11-09: automatic polling start, `mb log` default on, queue-drain and `mb silence` behaviour confirmed; user decisions). Depends on: 002, 010.
+Review: **bus-touching**. `firmware-reviewer` reviews this task independently.
 
 ## Goal
-Wire the P1 pipeline on the target: `rs485_rx` -> `rtu_sniff` -> `bus_monitor`, in one high-priority task that is the **single owner of the bus UART**, plus an `esp_console` REPL with diagnostic commands and a raw-chunk dump in the replay-fixture format, so the user can do the P1 measurements (008). `app_main` starts both.
+The phase-1 probe image: one task, the single owner of `mb_link`, runs the boot silence check, then drives `poll_step` (010) over `mb_link_read` (002), publishes snapshots and serves the `mb` console commands the on-site checklist (008) uses. `app_main` holds the transceiver in receive first, then starts the task and the REPL.
 
-## Zero-TX rules (P1/P2, binding)
-- Hardware: MAX485-M DE and /RE hardwired to GND, DI unconnected.
-- The bus UART is touched only through `rs485_rx` (`UART_MODE_UART`, RX pin only, TX/RTS/CTS = `UART_PIN_NO_CHANGE`). No console command may transmit on the bus or change UART mode/pins.
-- Forbidden outside `components/bus_tx/`: `mbc_master_*`, `mbc_slave_*`, `uart_write_bytes*`, `uart_tx_chars`, `uart_set_mode`, `uart_set_rts`, `uart_set_dtr`, `uart_set_loop_back`, `_uart_set_pin4/6`, esp-modbus controller headers. Console output goes through `printf`/`esp_console` on the console port, never on the bus UART. Build lint and ELF check must pass unchanged.
-- No esp-modbus controller instance (ELF check from 002).
+## Bus-safety rules (binding; architecture section 3)
+- First statement of `app_main`: `mb_link_hold_receive()`.
+- **Nothing is sent before the boot silence check passed** (`CONFIG_DMT_BUS_BOOT_SILENCE_MS`, D17). Activity > 0, or any error of the check or of `mb_link_init`, -> `poll_sched_latch()`; `mb_link_init` is then never called until reboot.
+- After a passed check and a successful `mb_link_init`, **polling starts automatically** (`poll_sched_start`, user decision 2026-11-09, architecture section 3 "Fallbacks"): the first frame goes out about `boot_silence_ms` (5 s) after boot. This is the only automatic start path. `mb poll off` / `mb poll on` stop and resume it; `mb probe` / `mb read` also work while stopped (010 rules 9, 10).
+- Commands queued while the silence check runs are all executed before the first `poll_step`, so a `mb poll off` typed during the 5 s window prevents the first automatic frame (abort path used by 008; user-approved 2026-11-09).
+- Every request goes through `poll_sched`/`poll_step` (gap, retry, health); console reads are MANUAL/SWEEP requests, never direct `mb_link_read` calls.
+- Only `bus_task` calls `mb_link_*` (after `app_main`'s first hold call).
+- No write path exists (lint R7, ELF check); `mb status` prints `write: compiled out`.
+- Console never on the bus UART: compile-time `#error` if a UART console uses `CONFIG_DMT_BUS_UART_PORT` (check the v6.0.2 console symbol names) plus a runtime check at start (architecture section 2, console rule).
 
 ## Files / directories owned
-- `firmware/components/bus_task/` (new): `CMakeLists.txt` (`REQUIRES rs485_rx rtu_sniff bus_monitor console esp_timer freertos`, `-Wall -Wextra -Werror`), `include/bus_task.h`, `src/bus_task.c`, `src/bus_console.c`
-- `firmware/components/bus_fmt/` (new, pure; see Test strategy)
-- `firmware/main/main.c`, `firmware/main/CMakeLists.txt` (REQUIRES `bus_task`)
-- `firmware/test/host/main/CMakeLists.txt` (add `bus_fmt` to `REQUIRES`)
+- `firmware/components/bus_task/` (new): `CMakeLists.txt` (`REQUIRES mb_link poll_sched reg_model daikin_regs console esp_timer freertos esp_app_format`, `-Wall -Wextra -Werror`), `include/bus_task.h`, `src/bus_task.c`, `src/mb_console.c`, `src/log_out.c`
+- `firmware/main/main.c`, `firmware/main/CMakeLists.txt` (`REQUIRES bus_task`)
 
 ## Wiki pages relied on
-- `concepts/firmware-architecture` (sections "Threading model", "Console commands", "Replay fixture format", "P1 measurement goals")
-- `concepts/register-map` (names/multipliers via `daikin_regs`), `concepts/flag-registers` (flag registers printed in hex)
-- `concepts/bus-topology` (open items P1 answers)
+- `concepts/firmware-architecture`, sections "1. Phases and exit criteria", "2. Components and threading" (component table: console commands; Threading), "3. Bus-safety rules" (Fallbacks, D16, D17, D21), "6. Decisions" (D19 address)
+- `concepts/register-map`, `concepts/flag-registers` (via `daikin_regs`: names, scaling; flag registers printed in binary)
 
 ## Interfaces
 ```c
-typedef struct { rs485_rx_config_t rx; int64_t resp_timeout_us; } bus_task_config_t;
+typedef struct { mb_link_config_t link; ps_config_t sched; uint32_t boot_silence_ms; } bus_task_config_t;
 esp_err_t bus_task_start(const bus_task_config_t *cfg);
-/* Thread-safe snapshot accessors for the console (and later P2): copy under the monitor mutex. */
-void bus_task_get_stats(rs485_rx_stats_t *rx, rtu_sniff_stats_t *sniff, bus_monitor_stats_t *mon);
-size_t bus_task_copy_regs(bus_reg_entry_t *out, size_t max);
-esp_err_t bus_task_request(bus_task_cmd_t cmd, uint32_t arg);   /* RESET_STATS, RESET_ALL, RX_RESTART(n) - executed by bus_task itself */
-void bus_task_set_dump(bool chunks, bool frames);
+typedef struct { reg_model_t model; ps_stats_t stats; ps_health_t health; uint8_t addr;
+                 uint32_t boot_activity; bool log_on; uint32_t log_dropped; uint32_t stack_hwm; } bus_snapshot_t;
+void bus_task_get_snapshot(bus_snapshot_t *out);   /* copy under mutex; console now, Matter in phase 2 */
+typedef enum { BT_CMD_POLL_ON, BT_CMD_POLL_OFF, BT_CMD_READ, BT_CMD_PROBE, BT_CMD_ADDR, BT_CMD_SILENCE, BT_CMD_LOG } bt_cmd_type_t;
+esp_err_t bus_task_command(bt_cmd_type_t type, uint32_t a, uint32_t b); /* queued, executed by bus_task; ESP_ERR_TIMEOUT if full */
 ```
 Threading (normative):
-- `bus_task`: priority 20, pinned to core 1, static stack (start at 4096, report the high-water mark). Loop: `rs485_rx_read(&chunk, 100)`; on data `rtu_sniff_feed`; frame callback -> `bus_monitor_on_frame` under the mutex; every loop `bus_monitor_tick(esp_timer_get_time())`; then execute at most one pending console command. Only this task calls `rs485_rx_*` (single UART owner; P3's `bus_tx` will run in this context too).
-- Dump/print path must never block `bus_task`: chunk and frame dump lines go into a FreeRTOS queue or ring buffer drained by a low-priority `bus_dump` task (priority 2); when full, drop and count `dump_dropped`.
-- Monitor mutex held only for copy operations; printing happens after release.
-- `main.c`: build `bus_task_config_t` from Kconfig (`CONFIG_DMT_BUS_*`), `#error` if the console is a UART with the same number as `CONFIG_DMT_BUS_UART_PORT`, start `bus_task`, start the REPL (UART or USB-Serial-JTAG according to the console Kconfig, as in IDF console examples). No NVS, Wi-Fi or Matter.
+- `bus_task`: static task, priority 10, pinned to core 1 (architecture section 2), stack 4096 (report high-water mark). Loop: take at most one command (`xQueueReceive`, timeout = `min(wait_until - now, 50 ms)`, 0 if a step is due); `poll_step()` with env = { adapter `mb_link_read` -> `ps_res_t` (`MBL_REFUSED` -> `PS_RES_ERROR`), clock = `esp_timer_get_time() / 1000` }; after each transaction copy model, stats and health into the snapshot under the mutex (copy only).
+- Output never blocks `bus_task`: `T`/`H` lines (`txn_log` v1, 010) go into a ring buffer drained by a `log_out` task (priority 2); full -> drop and count `log_dropped`. `H` lines, MANUAL and SWEEP `T` lines are always emitted; other `T` lines only while logging is on (default on from power-up, so the first automatic polls are logged; `mb log off` suppresses them).
+- `main.c`: `mb_link_hold_receive()`, build `bus_task_config_t` from `CONFIG_DMT_*` (001; stale thresholds 3 x period), `bus_task_start()`, then the REPL (UART or USB-Serial-JTAG per console Kconfig, as in the IDF console examples). No NVS, Wi-Fi, Matter.
 
-Console commands (all read-only with respect to the bus):
-- `bus status` - config (port, RX GPIO, baud, idle chars, timeout), uptime, `rs485_rx` stats, `rtu_sniff` stats, monitor counters, `dump_dropped`, bus_task stack high-water mark.
-- `bus regs` - mirror table: addr, reg (3 digits), name or `undocumented`, raw dec and hex, scaled value for 0.1-multiplier registers (signed for `signed_inferred`, marked `(inferred)`), flags in hex/binary, age ms, reads, writes, min/max interval ms, last source.
-- `bus timing` - gap, idle_gap and latency: count, min, avg, max, histogram.
-- `bus addrs` - slave addresses seen with request counts; exception table.
-- `bus dump chunks on|off`, `bus dump frames on|off`.
-- `bus reset [all]` - stats (and mirror with `all`).
-- `bus rx restart [n]` - `n` (default 1, max 1000) stop/start cycles executed by `bus_task`; prints free heap before/after and the result codes.
+Boot sequence in `bus_task`: emit `# dmt-probe v1 addr=<a> baud=<b> fw=<esp_app_get_description()->version>`; `mb_link_silence_check(boot_silence_ms)`; latch, or `mb_link_init`, drain the command queue, then `poll_sched_start(now)` unless a queued `mb poll off` was executed; emit an `H` line and a one-line hint (`silence ok, polling on: mb poll off to stop`).
 
-Dump line formats (normative, shared with 007):
-- Chunk: `RX <t_us> <idle 0|1> <disc 0|1> <hex bytes, lowercase, space separated>`
-- Frame: `FR <t_end_us> <kind> <hex bytes>` (kind = enum name without the `RTU_FRAME_` prefix)
+Console commands (argument errors print usage and never reach the bus). The first seven are named in architecture section 2; `mb addr` and `mb log` are additions this spec needs (Q6/D19 override; probe log; user-approved 2026-11-09).
+| Command | Effect |
+|---|---|
+| `mb status` | config from `bus_task_config_t` (not `CONFIG_*`, lint R6): port, TX/RX/DE GPIO, baud, Kconfig and current addr, gap, timeout, periods, retries, offline_after, probe period; health; boot silence activity; log state, `log_dropped`; stack HWM; `write: compiled out` |
+| `mb regs` | per register: reg (3 digits), name, `*` if starred, availability, raw dec/hex, value (MLT01 as `x.y`, signed where `is_signed`), FLAGS in binary, fresh/stale, age ms, ok/fail counts, exception code, `!range` if out of range |
+| `mb read <reg> [qty]` | MANUAL read, qty 1..4 (default 1); refusal text if `poll_sched_request_manual` returns -1 |
+| `mb probe` | SWEEP of all 32 documented registers (exit item 4); refused when LATCHED |
+| `mb poll on\|off` | `poll_sched_start` / `poll_sched_stop` (on refused with a message when LATCHED) |
+| `mb silence [s]` | s = 1..600, default 60 (D17): stop polling, `mb_link_deinit`, `mb_link_silence_check(s)`; activity > 0 or error -> latch; else `mb_link_init`, polling stays off until `mb poll on` (deliberately unlike boot; user-approved 2026-11-09) |
+| `mb stats` | `ps_stats_t`: counts per result and kind, error rate = (timeout + bad_frame + error) / txns in %, offline entries, latency min / median (`poll_sched_lat_median_ms`) / max (exit items 6, 7) |
+| `mb addr <1-247>` | RAM override (Q6, lost at reboot; no scan): `reg_model_reset`, `poll_sched_set_addr`, new header line |
+| `mb log on\|off` | all `T` lines on/off (default **on** from power-up, user decision 2026-11-09; the boot header line covers the boot-time start); `on` first emits the header line again |
 
 ## Acceptance checks
-1. Target build passes, zero warnings in owned code; lint and ELF check pass.
-2. `idf.py size` reported; no Wi-Fi/Matter components linked.
-3. Report shows the console command list (`help` output cannot be captured without a board: list the registered commands from the code instead).
-4. Review checklist in the report: single UART owner respected (grep `rs485_rx_` callers), no blocking printing in `bus_task`, mutex scope minimal.
-5. HIL behaviours are verified by the user through 008, not here.
+1. `cd firmware && idf.py build` passes, zero warnings in owned code; lint and ELF check pass; report `idf.py size`; no Wi-Fi/Matter components linked.
+2. Code inspection checklist in the report, with file:line: hold-receive is the first statement of `app_main`; no `mb_link_init` path before a passed silence check; the single `poll_sched_start` call of the boot path comes after a passed check, a successful `mb_link_init` and the queue drain; every latch path; only `bus_task` calls `mb_link_*` (grep output); no printing from `bus_task` except via the ring buffer; mutex scope = copy only.
+3. List of registered console commands with arguments (from code; `help` cannot be captured without a board).
+4. On-target behaviour is verified by the user through 008.
 
 ## Test strategy
-- Glue and console: target-only, no host tests (thin layer over host-tested 003/004).
-- The dump line formatters are pure and host-tested, because 007 parses the same format: put them in a small pure component `firmware/components/bus_fmt/` (owned by this task; `REQUIRES rtu_sniff`; `include/bus_fmt.h` with `size_t bus_fmt_chunk_line(char *buf, size_t n, int64_t t_us, bool idle, bool disc, const uint8_t *data, uint16_t len)` and `size_t bus_fmt_frame_line(char *buf, size_t n, const rtu_frame_t *f)`; `test_host/test_bus_fmt.c`), add `bus_fmt` to the host-test `REQUIRES`. Test: exact output strings, a 256-byte chunk, truncation when `n` is too small (returns 0, buffer NUL-terminated).
+- Glue and console: target-only, no host tests (thin layer over host-tested 009/010 and the 011 end-to-end tests on the same `poll_step` seam).
+- `T`/`H` line formats come from `txn_log` (host-tested in 010); no own formatting of those lines here.
 
 ## Recommended implementer model
-sonnet: FreeRTOS task/queue/mutex design with a non-blocking dump path and the IDF console API.
+sonnet: FreeRTOS task/queue/mutex design with a non-blocking output path, IDF console API and a safety-ordered boot sequence.
 
 ## Out of scope
-- Any transmit or polling, Matter, Wi-Fi, NVS, OTA.
-- Persisting captures to flash.
-- Parsing dumps (007).
+- Writes, write queue (phase 3), Matter, Wi-Fi, NVS (address override is RAM only), OTA.
+- Persisting logs on the device; parsing logs (011). Scheduling (project-wide).

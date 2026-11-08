@@ -1,28 +1,37 @@
 # Task specs
 
-Written by `architect` from the architecture approved by the user on 2026-11-07 (wiki: `concepts/firmware-architecture`). Implement one task per `firmware-dev` pass, in order; after each: `build-verifier` + `firmware-reviewer`.
+Written by `architect` from architecture **v0.3**, approved by the user on 2026-11-08 (Q1-Q10 answered with the recommendations; wiki: `concepts/firmware-architecture`). Spec-level choices answered by the user on 2026-11-09: automatic polling start after a clean boot silence check, normal USB power on site, all other listed choices accepted as written; follow-up answers the same day: commands typed during the boot silence check run before the first poll, polling stays off after an on-demand `mb silence` until `mb poll on`, `mb log` default on (006, 008). Implement one task per `firmware-dev` pass; after each: `build-verifier`, then `firmware-reviewer`. Bus-touching tasks (marked below) get an **independent `firmware-reviewer` review** of the spec result before the next task starts.
 
-Gate: only **P1 (listen-only)** tasks are released (D2 exception approved by the user). P2 (Matter read-only mirror) specs follow after P1 is done; P3 (guarded TX, U2 time-share) is specified only after the P1 measurements.
+## Gate
+- Released: **phase 1 (on-site read probe)** only, as a gate exception (Q8).
+- Phase 2 (Matter read-only mirror) and phase 3 (Matter writes behind `CONFIG_DMT_BUS_WRITE`) specs are written **only after the filled phase-1 probe log** (task 008, exit items 1-11) is in `Knowledgebase/raw/` and captured into the wiki.
 
-| # | Task | Depends on | Model | Status |
-|---|---|---|---|---|
-| 001 | [Skeleton, Kconfig, zero-TX lint, host-test runner](001-skeleton-kconfig-lint.md) | - | sonnet | spec ready |
-| 002 | [esp-modbus `==2.1.4` pin, `rtu_crc` over `mb_crc16`, guards, build spike](002-esp-modbus-crc-adapter-spike.md) | 001 | sonnet | spec ready |
-| 003 | [`rtu_sniff` frame splitter/decoder (pure)](003-rtu-sniff-decoder.md) | 002 | sonnet | spec ready |
-| 004 | [`bus_monitor` pairing, register mirror, stats (pure)](004-bus-monitor.md) | 003 | sonnet | spec ready |
-| 005 | [`rs485_rx` RX-only UART driver, stop/start](005-rs485-rx-driver.md) | 001 | sonnet | spec ready |
-| 006 | [`bus_task` glue, console, `bus_fmt`, `app_main`](006-bus-task-console.md) | 003, 004, 005 | sonnet | spec ready |
-| 007 | [Replay fixtures + end-to-end host test](007-replay-fixtures.md) | 003, 004, 006 | sonnet | spec ready |
-| 008 | [P1 bring-up HIL checklist + measurement log (document for the user)](008-p1-bringup-hil-checklist.md) | 006 | sonnet | spec ready |
+## Order (phase 1)
+| # | Task | Depends on | Model | Bus-touching | Status |
+|---|---|---|---|---|---|
+| 001 | [Skeleton, Kconfig, bus-access lint, host-test runner](001-skeleton-kconfig-lint.md) | - | sonnet | yes (lint) | spec ready |
+| 009 | [`daikin_regs` register table, scaling, whitelists](009-daikin-regs.md) | 001 | sonnet | yes (read whitelist) | spec ready |
+| 010 | [`reg_model` + `poll_sched`, health, `txn_log`](010-reg-model-poll-sched.md) | 009 | sonnet | yes (pacing) | spec ready |
+| 002 | [esp-modbus `==2.1.4` master spike, `rs485_port`, `mb_link` read, ELF check](002-esp-modbus-master-spike-mb-link.md) | 001, 009 | sonnet | yes | spec ready |
+| 006 | [`bus_task` poll loop, probe console, `app_main`](006-bus-task-console.md) | 002, 010 | sonnet | yes | spec ready |
+| 011 | [Fake slave, probe-log fixtures, end-to-end host tests](011-fake-slave-host-tests.md) | 010 | sonnet | yes (evidence) | spec ready |
+| 008 | [On-site probe checklist + measurement log (document)](008-p1-bringup-hil-checklist.md) | 006, 002 | sonnet | yes (procedure) | spec ready |
 
-Notes
-- 005 may run in parallel with 003/004. 008 may be drafted in parallel and finalised after 006.
-- The esp-modbus build spike of the v0.2 outline is merged into 002 because esp-modbus is a P1 dependency now (D7a = B) and the host-CRC route decided there determines how 003 is tested.
-- The v0.2 task "RO fan-out check" was dropped (D7b = U2).
-- If 002 finds that `mb_crc16` cannot be built for host tests (H0 and H1 fail), stop: the fallback (F1/F2) is a user decision.
+Parallelism: 009 and 010 may run in parallel with 002 (002 needs only `daikin_regs_read_allowed` from 009). 011 may start as soon as 010 is done. 008 may be drafted early and is finalised after 006 and the 002 spike report.
 
-## Zero-TX rules (P1/P2), restated in every bus-related spec
-1. Hardware: MAX485-M DE and /RE hardwired to GND, DI unconnected.
-2. Bus UART in `UART_MODE_UART` (never `uart_set_mode`), RX pin only: the single `uart_set_pin` call lives in `rs485_rx` with TX/RTS/CTS = `UART_PIN_NO_CHANGE`; TX buffer 0.
-3. Forbidden outside `components/bus_tx/` (absent in P1/P2): `mbc_master_*`, `mbc_slave_*`, `uart_write_bytes*`, `uart_tx_chars`, `uart_set_mode`; architect additions: `uart_set_rts`, `uart_set_dtr`, `uart_set_loop_back`, `_uart_set_pin4/6`, includes of esp-modbus controller headers. `mbcrc.h` only in `rtu_sniff/src/rtu_crc.c`. Enforced by `tools/check_zero_tx.py` on every build.
-4. esp-modbus is linked only for `mb_crc16`; no controller instance; a post-build ELF check fails if controller symbols are in the image.
+Escalations that stop the pipeline (user decision): 002 S3 (timeout vs exception not distinguishable: options E1/E2), 002 S5/S6/S12 deviations; 008 boot silence activity on the bench or on site.
+
+## Retired (v0.3, 2026-11-08; files kept as short notes so numbering and history stay clear)
+- 003 `rtu_sniff` -> replaced by 002 (`mb_link` over esp-modbus)
+- 004 `bus_monitor` -> replaced by 010
+- 005 `rs485_rx` -> replaced by 002 (`rs485_port`)
+- 007 replay fixtures -> replaced by 011
+- `002-esp-modbus-crc-adapter-spike.md` is a pointer to the renamed 002 file; remove it with `git rm` after the rename is committed.
+
+## Bus-safety rules, restated (architecture section "3. Bus-safety rules")
+1. Node = sole Modbus master on EKWHCTRL1 "A A B B -"; "+ A B -" and CP are never touched.
+2. FC03 only in phase 1, addresses 1..247, never broadcast; registers from the `daikin_regs` read whitelist (qty 1 automatic, 1-4 manual); no write source exists (`CONFIG_DMT_BUS_WRITE` default n, build fails if set).
+3. Boot silence check (5 s) and on-demand `mb silence` (default 60 s): any activity -> latched refusal to transmit until reboot. After a clean boot check polling starts automatically (first frame about 5 s after power-up; user decision 2026-11-09); `mb poll off` / `mb poll on` stop and resume it.
+4. Pacing: one transaction at a time, >= 100 ms gap, 500 ms timeout, 1 retry on timeout/CRC (none on exception), exception 02 -> register unsupported until reboot, DEGRADED on 1-4 and OFFLINE after 5 consecutive failures, then only reg 000 every 30 s; `mb poll off` stops all automatic traffic.
+5. Transceiver held in receive (DE GPIO low, 10 kOhm pull-down) whenever esp-modbus is not running.
+6. Enforcement: `tools/check_bus_access.py` (+ `--self-test`) on every build, `tools/check_elf_symbols.py` post-build.
