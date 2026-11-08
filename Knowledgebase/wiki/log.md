@@ -105,3 +105,10 @@ No raw files added or changed. User answers (session 2026-11-09, not in raw) plu
 - concepts/firmware-architecture section 3 lint text rewritten as a summary of R1–R8 citing the task-001 spec; the two section-8 lint open questions resolved: R3 esp-modbus master/common headers only in `components/mb_link/src/` (`esp_modbus_slave.h` nowhere, R2); R4 `uart_write_bytes*`, `uart_tx_chars`, `uart_set_rts`, `uart_set_dtr`, `uart_set_loop_back`, `uart_set_line_inverse`, `_uart_set_pin*` banned everywhere.
 - index.md summary for firmware-architecture.
 - The 2026-11-09 note about `tasks/README.md` rule 3 (polling off after boot) is fixed by the architect (checked by wiki-keeper: rule 3 now says polling starts automatically after a clean boot check).
+
+## [2026-11-09] sync | task 001 accepted, session end
+No raw files added or changed. Session implementation facts (verified build/test output, not in raw): task 001 implemented by `firmware-dev`, accepted 2026-11-09 after two review rounds (`firmware-reviewer` accepted, `build-verifier` all checks pass); committed in the session-end commit with the amended spec 001.
+- concepts/firmware-architecture section 7: 001 done, 009 next; open minor (self-test lacks explicit `^= -= *= /= %= >>=` cases).
+- concepts/project-goal: tasks line, 001 done, 009 next.
+- concepts/dev-environment: new "Host build facts" section (`idf.py --preview set-target linux`, `libbsd-dev` needed, user action pending; esp-clang/clang-tidy not installed; lint stdlib Python on every build); open question 3.
+- index.md summaries for project-goal, dev-environment, firmware-architecture.

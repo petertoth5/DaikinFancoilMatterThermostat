@@ -233,7 +233,7 @@ User statements in the session of 2026-11-09, not in raw; answers to the archite
 
 ## 7. Task impact
 
-Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006, 011, 008 **spec ready**; 003/004/005/007 retired. The 002 spec now lives in `tasks/002-esp-modbus-master-spike-mb-link.md`; the old `tasks/002-esp-modbus-crc-adapter-spike.md` is a pointer, to be removed with `git rm` at commit.
+Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006, 011, 008 **spec ready**; 003/004/005/007 retired. **Update 2026-11-09 (session implementation facts, verified build/test output; not in raw):** task **001 done**: implemented by `firmware-dev` and accepted on 2026-11-09 after two review rounds (`firmware-reviewer` accepted; `build-verifier` all checks pass); committed in the session-end commit together with the amended spec `tasks/001-skeleton-kconfig-lint.md`. **Next: 009**, then 010, 002, 006, 011, 008. Open minor: the lint self-test has no explicit cases for `^=`, `-=`, `*=`, `/=`, `%=`, `>>=` (the R8 rule catches them; follow-up with 009 or later). Host-build details: [[concepts/dev-environment]]. The 002 spec now lives in `tasks/002-esp-modbus-master-spike-mb-link.md`; the old `tasks/002-esp-modbus-crc-adapter-spike.md` is a pointer, to be removed with `git rm` at commit.
 
 | Task | Change |
 |---|---|
