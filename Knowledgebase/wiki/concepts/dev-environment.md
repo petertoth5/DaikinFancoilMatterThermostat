@@ -2,7 +2,7 @@
 title: Dev environment
 type: concept
 sources: ["project-brief.md"]
-updated: 2026-11-07
+updated: 2026-11-08
 ---
 
 # Dev environment
@@ -23,10 +23,10 @@ updated: 2026-11-07
 - `espressif/esp_matter` 1.6.1, supports all targets incl. esp32s3; page recommends ESP-IDF v6.0.2 for Matter projects; install with `idf.py add-dependency "espressif/esp_matter^1.6.1"`.
 
 ## Approved components (user decision 2026-11-07; versions from the registry, external)
-- `espressif/esp-modbus` **==2.1.4** exact: P1 uses only its private `mb_crc16` (CRC); P3 its serial master.
+- `espressif/esp-modbus` **==2.1.4** exact (pin re-confirmed by the user 2026-11-08, v0.3 Q9): serial master via `mbc_master_send_request` from phase 1 on, only in `components/mb_link/`. *(Superseded 2026-11-07 v0.2 use: P1 only its private `mb_crc16`, P3 its serial master.)*
 - `espressif/esp_matter` ^1.6.1: P2.
 Details, guards and phases: [[concepts/firmware-architecture]].
 
 ## Open questions
 1. Flashing/monitoring path from WSL2 (usbipd) or Windows — decide when a board is attached.
-2. `espressif/esp_matter` and its (large) dependencies are not yet added; architecture now settled, added in P2 ([[concepts/firmware-architecture]]). esp-modbus is added in task 002.
+2. `espressif/esp_matter` and its (large) dependencies are not yet added; architecture v0.3 approved 2026-11-08, added in phase 2 ([[concepts/firmware-architecture]]). esp-modbus is added in task 002.

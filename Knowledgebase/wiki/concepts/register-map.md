@@ -2,12 +2,16 @@
 title: Modbus register map
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-07
+updated: 2026-11-08
 ---
 
 # Register map
 
 Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-modbus-rtu]]; wording differences listed on that source page). Addresses are decimal. "mlt" = multiplier: raw × mlt = value (0.1 → tenths of unit). Limits must be respected. `*` = only on [[entities/inn-fr-b32]] board.
+
+**Scope and star list (`datasheet-reader`, both files, pages rendered as images, 2026-11-08):** p4 intro: "addresses of the control parameters resident on the INN-FR-B32 and EKWHCTRL0 board and the EKRTCTRL1 and EKWHCTRL1 wall-mounted control panel" (file 2: "INN-FR-B32 e EKWHCTRL0"). p4 also: "The limit values must be respected!" and "take into account the multiplication factor mlt during reading". Starred "* Only for INN-FR-B32 board": 001, 009, 015, 104, 210, 211, 212, 213, 214, 215, 218, 219, 243, 244. Unstarred: 000, 008, 105, 200, 201, 202, 203, 209, 221, 222, 230, 231, 233, 234, 242, 245, 246, 247. The table below matches this list (checked 2026-11-08, no mismatch).
+- 230 MVVP3 and 234 MVVP2 are printed **unstarred** while 210–215 (incl. MVVP1 215) are starred; looks inconsistent, recorded as printed.
+- Not stated whether the panel proxies starred registers. *(Inferred:)* via EKWHCTRL1 "A A B B -" only unstarred registers are reliable; starred ones may be absent or return an exception; test in phase 1 ([[concepts/bus-topology]] item 4).
 
 | Reg | Name | Range | Description | R/W | mlt | Default |
 |---|---|---|---|---|---|---|
@@ -45,7 +49,9 @@ Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-
 | 247 | WEB | – | Supervisor flags ([[concepts/web-restriction-flags]]) | R/W | flag | 0 |
 
 ## Notes / source quirks
-- Writing the setpoint: write the absolute value to **231** (p6); 008 is the read-only real setpoint.
+- Writing the setpoint: p6 "To enter the setpoint, write the absolute value within the selected scale in register 231 SP."; 008 is the read-only real setpoint.
+- PRG 201 bits 8–15: "System Flags reserved, do not change the status" (p5, [[concepts/flag-registers]]).
+- Reg 218/219: file 2 descriptions omit "temperature" ("Minimum water for heating" / "Maximum water for cooling") ([[sources/n420384a-modbus-rtu]]).
 - Reg 233 labels "inv"/"est" are Italian (inverno = winter, est**ate** = summer) *(inferred)*.
 - Limits column shows "SHP" for 231 and "SPH" elsewhere; likely a typo for SPH *(inferred)*.
 - MVV limit for 210 prints "MVV3-4" (unclear whether minus 4 or MVV3/MVV4).

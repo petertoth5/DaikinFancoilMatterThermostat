@@ -60,3 +60,48 @@ Check after fixes: 19 pages, 0 broken links, 0 orphans, all pages in index, fron
 
 ## [2026-11-07] sync | firmware architecture approved
 User decisions (session 2026-11-07, not in raw): accepted architecture v0.2 recorded as new concepts/firmware-architecture (architect base text + orchestrator corrections A–I from v0.2: single compile-time TX gate `CONFIG_APP_BUS_TX`, no runtime TX enable; Thermostat/Fan mapping; P3 outline; GPIO; commissioning; D1–D15). External facts (registry, esp-modbus v2.1.4 source, IDF, CHIP data_model, Modbus spec) labelled as such. Superseded: v0.1 "Kconfig + NVS" TX enable. Linked from index, concepts/project-goal (architecture done, Tasks pointer: P1 specs 001–008), concepts/bus-topology (firmware plan: items 1/1b/4/5 measured in P1, 3/3a in tasks/008), concepts/dev-environment (approved components), entities/esp32-s3-wroom-1 (GPIO). Open user points: extra zero-TX lint names, F1/F2, RX GPIO placeholder, hardware items.
+
+## [2026-11-08] sync | tap point changed to A A B B -, redesign ordered
+User decision (session 2026-11-08, not in raw; no raw files changed): the new node connects to the EKWHCTRL1 "A A B B -" ModBus RTU port, not the "+ A B -" fancoil link (user quote recorded on concepts/bus-topology). Agrees with the manual p3 legend A/B (visually verified earlier by `datasheet-reader`). Redesign ordered.
+- concepts/bus-topology: banner + new 2026-11-08 section; 2026-11-07 tap-point answer (Q1) and "Firmware plan" paragraph marked superseded (text kept); role Q2 marked pending user re-confirmation; open items re-evaluated: 1, 1b reframed for "A A B B -", 2 and 4 to be re-evaluated in redesign, 3 now concerns the "A A B B -" segment, 5 reframed, 6 DECIDED, 7 flagged more relevant, new 8 (role); new question: anything else on "A A B B -"?
+- entities/ekwhctrl1: "This installation" gets the 2026-11-08 decision; (c) resolved; (d) flagged; (a)/(b) to be re-evaluated.
+- concepts/firmware-architecture: status note at top, v0.2 superseded for the tap point, v0.3 pending; body unchanged.
+- concepts/project-goal: redesign in progress, P1 specs 001–008 on hold.
+- index.md summaries updated for the four pages.
+
+## [2026-11-08] sync | A A B B - port facts, sole-master role, staged phasing
+No raw files added or changed. Inputs: user answers (session 2026-11-08, not in raw) and `datasheet-reader` visual check of both N420384A PDFs (all pages rendered as images, p3 at 600 dpi; PDF page = printed page).
+- User: manual read = one of the two N420384A PDFs in raw; nothing connected to "A A B B -"; node = SOLE Modbus master on "A A B B -" (FC03 polling, FC06 only on Matter commands), supersedes the 2026-11-07 "passive monitor" role (text kept, marked); staged phasing read probe -> read-only mirror -> writes, write code compiled out until phase 3; "-AB+" = "+ A B -" (removed the "(inferred)" mark).
+- concepts/bus-topology: new second-round section; items 1/1b/2/3/4/5/7 rewritten (arbitration no longer applies, inferred; termination/cabling ambiguity; CP block resolved, new "-" shared GND sub-question); items 6/8 answered; phase-1 [P1] questions; manual-facts summary.
+- entities/ekwhctrl1: "A A B B -" facts section (6-way block, not-stated list, slave inferred with p1/p3/p6 quotes, daisy-chain inferred); 120 Ω only on fancoil chain; (c)/(d) resolved; new (e) phase-1 checks.
+- concepts/modbus-rs485-link: serial settings quoted, port not named, FC03 quantity>1 not stated; cabling rules ambiguity added; "new third node on this bus" marked superseded.
+- concepts/device-addressing: fixed "up/down" -> [+]/[—] keys; reg 200 note; p7 quote; port not stated.
+- concepts/register-map: p4 scope quote, star list checked (no mismatch), 230/234 inconsistency, starred-via-panel inference, p4/p5/p6 quotes.
+- concepts/flag-registers: 300 s timeout re-assessed (not evidence about "A A B B -", inferred low-medium); old "bus-design relevance" line marked superseded; PRG bits 8–15 quote.
+- concepts/web-restriction-flags: persistence quote, FLAG 1 "(247.0)" typo in both files, FLAG 7 wording, setpoint quote.
+- concepts/firmware-architecture: status note extended (role and phasing re-decided, v0.3 being drafted). concepts/project-goal: role, phasing, gate.
+- sources/n420384a-english, sources/n420384a-modbus-rtu: re-check facts and F1/F2 differences (500 m/50 units omitted, 218/219 wording, "SET+ e SET-").
+- index.md summaries updated.
+
+## [2026-11-08] sync | firmware architecture v0.3 approved
+No raw files added or changed. User decision (session 2026-11-08, not in raw): architecture v0.3 approved, Q1–Q10 all answered with the architect's recommendation (Q1 DE + /RE tied to RTS, 10 kΩ pull-down; Q2 233 = 0 without STAT -> last explicit season, default Heat, console flag; Q3 timing defaults; Q4 boot silence check; Q5 247 read-only; Q6 address Kconfig default 1 + RAM override, no scan; Q7 write caps; Q8 gate exception for stage-1 specs; Q9 esp-modbus ==2.1.4; Q10 D3/D4 re-approved).
+- concepts/firmware-architecture: rewritten as v0.3 with sections 1–8 (phases and probe exit criteria 1–11, components and threading, bus-safety rules, hardware wiring, Matter mapping, decisions D1–D22, task impact, open items); v0.2 Matter mapping details, commissioning D11, GPIO avoid list, console rule and D14 merged in; v0.2 reduced to a "Superseded v0.2 (2026-11-07)" table. Conflict recorded: reg 200 range 1–255 (manual) vs Modbus 1..247 (external). Two gaps flagged as open (CONFIG_UART_ISR_IN_IRAM; 233 = 0 with STAT bits both/neither set).
+- concepts/project-goal: v0.3 approved, stage-1 specs being written, gate open for stage 1 only.
+- concepts/bus-topology: banner, new "Firmware plan v0.3" section (D1 hard rule, Q8 gate exception, probe items -> open items mapping, inferred); v0.2 plan section renamed.
+- concepts/dev-environment: esp-modbus use per v0.3 (v0.2 use marked superseded).
+- entities/ekwhctrl1: redesign pointer -> v0.3 approved.
+- index.md summaries for firmware-architecture, project-goal, bus-topology, dev-environment.
+
+## [2026-11-09] sync | stage-1 detail decisions
+No raw files added or changed. User decisions (session 2026-11-09, not in raw) on the architect's stage-1 detail questions: polling starts automatically after a clean 5 s boot silence check (architect proposed waiting for a console command); `mb poll off/on` remain, probe/manual reads work while stopped without retry and without changing health; site power = normal USB (architect proposed battery laptop / USB isolator; declined), GND-to-"-" measurement rule unchanged. Accepted architect details: `mb addr <1-247>` (RAM-only, D19), `mb log on|off`; DEGRADED = 1–4 failures, OFFLINE at 5; exceptions other than 02 no retry, 60 s backoff, not counted toward OFFLINE; stale = 3 × group period (15 s / 180 s); stricter bus-access lint; no write file in phase 1 (gate on fails the build until phase 3); host fake slave at the `poll_sched` link-function seam; Kconfig safety-cap ranges; GPIO defaults TX 5 / RX 4 / DE 6; `CONFIG_UART_ISR_IN_IRAM=y` kept; new risk unbiased idle line tripping the silence check.
+- concepts/firmware-architecture: new section 6 subsection "Stage-1 detail decisions (user, 2026-11-09)"; sections 1–4 adjusted where v0.3 text contradicted (console commands, fake-slave seam, ISR in IRAM, Kconfig caps, health/exception/stale rules, fallbacks, lint, write gate, GPIO defaults, site power); section 7 status (specs ready, 002 file renamed, old pointer to `git rm`); section 8: ISR gap resolved, panel LV isolation open, idle-bias risk, two lint details not restated (esp-modbus header location, `uart_set_loop_back`).
+- concepts/project-goal: stage-1 specs ready, adjusted to the detail decisions.
+- index.md summary for firmware-architecture.
+- Noted, not edited (tasks/ is architect-owned): `tasks/README.md` rule 3 still says polling is off after boot until `mb probe` / `mb read` / `mb poll on`, contradicting the 2026-11-09 decision.
+
+## [2026-11-09] sync | boot window, mb silence, mb log default
+No raw files added or changed. User answers (session 2026-11-09, not in raw) plus the approved spec `tasks/001-skeleton-kconfig-lint.md` (read only, not edited).
+- concepts/firmware-architecture: section 6 "Stage-1 detail decisions" gains three rows: console commands typed during the 5 s boot silence check run before the first poll (`mb poll off` / `mb addr N` stop or redirect the first frame), approved; `mb silence <s>` leaves polling off after a passed check until `mb poll on` (differs from boot), approved; `mb log` default ON from power-up (architect proposed off, user chose on). Section 2 console row and section 3 fallbacks updated accordingly; status note extended.
+- concepts/firmware-architecture section 3 lint text rewritten as a summary of R1–R8 citing the task-001 spec; the two section-8 lint open questions resolved: R3 esp-modbus master/common headers only in `components/mb_link/src/` (`esp_modbus_slave.h` nowhere, R2); R4 `uart_write_bytes*`, `uart_tx_chars`, `uart_set_rts`, `uart_set_dtr`, `uart_set_loop_back`, `uart_set_line_inverse`, `_uart_set_pin*` banned everywhere.
+- index.md summary for firmware-architecture.
+- The 2026-11-09 note about `tasks/README.md` rule 3 (polling off after boot) is fixed by the architect (checked by wiki-keeper: rule 3 now says polling starts automatically after a clean boot check).
