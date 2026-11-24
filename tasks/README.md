@@ -12,7 +12,7 @@ Written by `architect` from architecture **v0.3**, approved by the user on 2026-
 | 001 | [Skeleton, Kconfig, bus-access lint, host-test runner](001-skeleton-kconfig-lint.md) | - | sonnet | yes (lint) | done (implemented and accepted 2026-11-09: firmware-reviewer accept after two rounds, build-verifier all checks pass); lint R1/R3/R4/R8 redefined by 013 |
 | 009 | [`daikin_regs` register table, scaling, whitelists](009-daikin-regs.md) | 001 | sonnet | yes (read whitelist) | done (accepted 2026-11-24, committed) |
 | 010 | [`reg_model` + `poll_sched`, health, `txn_log`](010-reg-model-poll-sched.md) | 009 | sonnet | yes (pacing) | done (accepted 2026-11-24 after amendment U1-U6: build-verifier PASS, firmware-reviewer APPROVE) |
-| 012 | [`mb_rtu` pure FC03 frame codec (CRC, builder, classifier)](012-mb-rtu-frame-codec.md) | 001 | sonnet | yes (frame builder, classifier) | spec ready (new 2026-11-24) |
+| 012 | [`mb_rtu` pure FC03 frame codec (CRC, builder, classifier)](012-mb-rtu-frame-codec.md) | 001 | sonnet | yes (frame builder, classifier) | done (accepted 2026-11-24: build-verifier PASS, firmware-reviewer APPROVE WITH MINORS, minors applied) |
 | 013 | [Lint update "no esp-modbus", ELF symbol check](013-lint-elf-check-no-esp-modbus.md) | 001, 012 | sonnet | yes (lint, ELF) | spec ready (new 2026-11-24) |
 | 014 | [`rs485_port` + `mb_link` read path over the UART](014-rs485-port-mb-link.md) | 009, 012, 013 | sonnet | yes (first TX code) | spec ready (new 2026-11-24; amended 2026-11-24, user decision: no fake-port host test, seam rule, fallback E1b) |
 | 006 | [`bus_task` poll loop, probe console, `app_main`](006-bus-task-console.md) | 014, 010 | sonnet | yes | spec ready (amended 2026-11-24) |

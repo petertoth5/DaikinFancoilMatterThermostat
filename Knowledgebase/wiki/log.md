@@ -168,3 +168,19 @@ No raw files added or changed. User decisions (session 2026-11-24, not in raw) a
 - Specs 012 (`mb_rtu`), 013 (lint/ELF, before 014), 014 (`rs485_port` + `mb_link`) ready; 002 retired note; 006/008/010/001/README amended by the architect. Order 012 -> 013 -> 014 -> 006 -> 008, 011 any time; all sonnet; independent firmware-reviewer review for 012/013/014. Lint compound-operator minor scheduled in 013.
 - concepts/firmware-architecture: header addendum; section 2 (mb_link counters, Modbus layer: E1b fallback, task files); section 3 (gap bytes, FREERTOS_HZ, exc 0x00, lint/ELF task 013); section 6 (E2 row, new rows E1b..Task order); section 7 (status, table 002 retired + 012/013/014, order); section 8 (inter-byte timing risk corrected from INN-FR-B32 to the answering slave on "A A B B -", orchestrator wording error; E1b fallback note).
 - concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture.
+
+## [2026-11-24] sync | measured flag; specs 012-014 committed
+User decision (session 2026-11-24, not in raw): keep the `measured` flag in `mb_link_counters_t` (architect proposal, approved). No raw files changed.
+- Commits (pushed to origin/main): `3310030` (specs 012-014 + spike report `docs/spikes/002-esp-modbus.md`), `895d7ee` (wiki: S3 decision E2, E1b fallback, spike facts), `236f047` (`.claude/agents/architect.md` and `orchestrator.md` fix: sole master on "A A B B -", D1).
+- concepts/firmware-architecture: section 6 "Task 002 spike decisions" new row "Seam types and `measured` flag" (`mb_link.h` own `mb_link_port_cfg_t` and `mb_link_counters_t`, no `rs485_port.h` include, seam rule spec 014; E2 `measured = true`; E1b `measured = false`, zeros, `mb status` prints `link counters: n/a`); section 2 `mb_link` row points to it.
+- index.md summary for firmware-architecture updated.
+
+## [2026-11-24] sync | task 012 accepted
+No raw files added or changed. Session facts (task 012 implementation and review, verified output, not in raw; not committed).
+- Task 012 (pure `mb_rtu`, `firmware/components/mb_rtu/`, host REQUIRES in `firmware/test/host/main/CMakeLists.txt`) implemented by `firmware-dev` (sonnet). `build-verifier` PASS: esp32s3 fresh build 0 warnings; host tests 118 Tests, 0 Failures, 0 Ignored; bus-access lint rc 0, self-test 82 ok; no esp_/FreeRTOS/driver includes; registry-only, no esp-modbus; clang-tidy SKIPPED (not installed).
+- `firmware-reviewer`: APPROVE WITH MINORS. Independent ASan/UBSan build: builder (1, 0, 1) gives `01 03 00 00 00 01 84 0A`; CRC vectors 0x4B37 / 0x1241; t3.5 at 9600 = 4011 us; 3M random-frame fuzz clean.
+- Minors: (a) `val == NULL` moved to the caller-error rule (BAD_FRAME, after TIMEOUT), spec 012 rule 2 amended; (b) 19201 -> 1750 t3.5 test; both applied by `firmware-dev` (haiku), re-verified 118/0/0, 0 warnings, lint rc 0. (c) `mb_rtu_fc03_reply_len` does not validate qty: spec 014 amended (reply-length adapter in `mb_link` maps UNKNOWN and > `MB_RTU_MAX_REPLY_LEN` to "more"; rx buffer `MB_RTU_MAX_REPLY_LEN + 1` with write guard; acceptance 3k).
+- Task 012 done, accepted 2026-11-24, not committed. Next: 013, then 014, 006, 011, 008.
+- concepts/firmware-architecture: section 2 `mb_rtu` row; section 7 update paragraph, table rows 012/013/014, order line.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture.
+- Not changed: `tasks/` (spec 012/014 amendments and `tasks/README.md` are already modified in the working tree, edited by the architect; the README 012 status line may still read "spec ready").

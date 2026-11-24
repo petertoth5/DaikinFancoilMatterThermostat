@@ -1,6 +1,6 @@
 # 012 - `mb_rtu`: pure FC03 RTU frame codec (CRC, request builder, reply classifier)
 
-Phase: 1. Status: spec ready (new 2026-11-24, user decision E2 on the 002 S3 escalation; replaces part (a) of retired 002). Depends on: 001 (host-test runner).
+Phase: 1. Status: done (accepted 2026-11-24: build-verifier PASS, firmware-reviewer APPROVE WITH MINORS, minors applied). Spec new 2026-11-24, user decision E2 on the 002 S3 escalation; replaces part (a) of retired 002. Depends on: 001 (host-test runner).
 Review: **bus-guarding** (it builds the only request frame and decides how replies are classified). `firmware-reviewer` reviews this task independently before 013 starts.
 
 ## Goal
@@ -51,7 +51,8 @@ size_t mb_rtu_fc03_reply_len(uint16_t qty, const uint8_t *rx, size_t n);
 
 /* Classify a complete received byte sequence (everything the port collected for this transaction).
    *exc_code is set to 0 on entry (if non-NULL) and to the code only for MB_RTU_EXCEPTION;
-   val[0..qty-1] (host order) is written only for MB_RTU_OK. */
+   val[0..qty-1] (host order) is written only for MB_RTU_OK. val == NULL -> MB_RTU_BAD_FRAME (caller error,
+   classifier rule 2; (amended 2026-11-24, reviewer minor)). */
 mb_rtu_res_t mb_rtu_parse_fc03_reply(uint8_t addr, uint16_t qty, const uint8_t *rx, size_t len,
                                      uint16_t *val, uint8_t *exc_code);
 
@@ -64,7 +65,7 @@ uint32_t mb_rtu_t35_us(uint32_t baud);
 
 ### Classifier rules (normative, evaluated in this order; the first matching rule decides)
 1. `len == 0` -> `MB_RTU_TIMEOUT` (no byte received).
-2. `rx == NULL`, `addr` not 1..247 or `qty` not 1..4 -> `MB_RTU_BAD_FRAME` (caller error; never expected).
+2. `rx == NULL`, `val == NULL`, `addr` not 1..247 or `qty` not 1..4 -> `MB_RTU_BAD_FRAME` (caller error; never expected; `val == NULL` added (amended 2026-11-24, reviewer minor)).
 3. `len < 5` -> `BAD_FRAME` (short).
 4. `rx[0] != addr` -> `BAD_FRAME` (wrong address).
 5. `rx[1] == FC03 | 0x80` (exception):
