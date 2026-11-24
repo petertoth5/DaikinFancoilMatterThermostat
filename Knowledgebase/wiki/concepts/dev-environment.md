@@ -2,7 +2,7 @@
 title: Dev environment
 type: concept
 sources: ["project-brief.md"]
-updated: 2026-11-09
+updated: 2026-11-24
 ---
 
 # Dev environment
@@ -29,11 +29,13 @@ updated: 2026-11-09
 - `espressif/esp_matter` 1.6.1, supports all targets incl. esp32s3; page recommends ESP-IDF v6.0.2 for Matter projects; install with `idf.py add-dependency "espressif/esp_matter^1.6.1"`.
 
 ## Approved components (user decision 2026-11-07; versions from the registry, external)
-- `espressif/esp-modbus` **==2.1.4** exact (pin re-confirmed by the user 2026-11-08, v0.3 Q9): serial master via `mbc_master_send_request` from phase 1 on, only in `components/mb_link/`. *(Superseded 2026-11-07 v0.2 use: P1 only its private `mb_crc16`, P3 its serial master.)*
 - `espressif/esp_matter` ^1.6.1: P2.
+- **Removed 2026-11-24:** `espressif/esp-modbus`. The user reversed D7/Q9 and chose an own minimal FC03-only RTU master (E2, user decision, session 2026-11-24, not in raw; [[concepts/firmware-architecture]] section 6 "Task 002 spike decisions"). Reason: the task-002 spike found that 2.1.4 merges slave exception and bad reply into one error and drops the exception code (project evidence, `docs/spikes/002-esp-modbus.md` S3, not a raw source); 2.1.4 was the latest registry version (registry page fetched 2026-11-24, external).
+  - *History:* `espressif/esp-modbus` **==2.1.4** exact (pin re-confirmed by the user 2026-11-08, v0.3 Q9): serial master via `mbc_master_send_request` from phase 1 on, only in `components/mb_link/`. *(Superseded 2026-11-07 v0.2 use: P1 only its private `mb_crc16`, P3 its serial master.)*
+- **Registry-only rule and own code (user-confirmed interpretation, session 2026-11-24, not in raw):** own project components (e.g. `mb_rtu`, `rs485_port`) are compliant: E2 adds no dependency and removes one.
 Details, guards and phases: [[concepts/firmware-architecture]].
 
 ## Open questions
 1. Flashing/monitoring path from WSL2 (usbipd) or Windows — decide when a board is attached.
-2. `espressif/esp_matter` and its (large) dependencies are not yet added; architecture v0.3 approved 2026-11-08, added in phase 2 ([[concepts/firmware-architecture]]). esp-modbus is added in task 002.
+2. `espressif/esp_matter` and its (large) dependencies are not yet added; architecture v0.3 approved 2026-11-08, added in phase 2 ([[concepts/firmware-architecture]]). *(Superseded 2026-11-24: "esp-modbus is added in task 002"; esp-modbus is not used, E2.)*
 3. `libbsd-dev` for the linux host target: user to install (`sudo apt install libbsd-dev`).
