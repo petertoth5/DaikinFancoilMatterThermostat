@@ -282,3 +282,9 @@ No raw files added or changed. User decision (session 2026-11-24, not in raw; ci
 - concepts/project-goal: tasks line (006 done, next 011, 008). index.md summaries for project-goal and firmware-architecture updated.
 - Open, unchanged: Q-HW1 (oscilloscope or logic analyser), Q-HW2 (no flash/NVS load command in the 006 image); `bus_task` 4 KB stack to verify on site; firmware-architecture section 6 row A14 (013 doc minors).
 - Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed by the wiki-keeper (the firmware commit `b8ad00d` is the user's).
+
+## [2026-11-24] sync | session suspended
+No raw files added or changed. Session facts (local `git log` / `git status`, not in raw). Task 006 spec and wiki docs committed and pushed as `564fcc5` (on `main`, in sync with `origin/main`). User suspended the session at this point. Working tree clean except untracked `.vscode/` and `ProjectDefinitionPrompt.txt` (intentionally not committed).
+- Next session starts with RESUME "Next" item 1: task 011 (fake-slave host tests and end-to-end host tests).
+- RESUME.md: last step, status (tooling note on RTK-rewritten read-only Bash calls being blocked for subagents), start prompt unchanged.
+- Not changed: `index.md`, concepts/, entities/, sources/, `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.

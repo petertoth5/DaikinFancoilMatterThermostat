@@ -6,7 +6,7 @@ Update after EVERY step. Keep short.
 Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, connecting to the Daikin EKWHCTRL1 **"A A B B -" Modbus RTU port** (nothing else connected there). Node = **sole Modbus master** (FC03 polling, FC06 only on Matter commands); staged phasing: 1 on-site read probe -> 2 Matter read-only mirror -> 3 Matter writes (write code compiled out until 3). User decisions 2026-11-08. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
 
 ## Last step (2026-11-24)
-Task 006 (bus_task, probe console, `app_main`) accepted by the user and committed and pushed as `b8ad00d`. Review fixes T1–T7 applied and verified (`build-verifier` PASS, `firmware-reviewer` re-review APPROVE). This is the first flashable phase-1 probe image; it has not been run on hardware. Wiki: firmware-architecture section 6 "Task 006 acceptance", sections 7 and 8, project-goal, index, log.
+Task 006 (bus_task, probe console, `app_main`) accepted by the user and committed and pushed as `b8ad00d`. Review fixes T1–T7 applied and verified (`build-verifier` PASS, `firmware-reviewer` re-review APPROVE). This is the first flashable phase-1 probe image; it has not been run on hardware. Wiki: firmware-architecture section 6 "Task 006 acceptance", sections 7 and 8, project-goal, index, log. The 006 spec and wiki docs were committed and pushed as `564fcc5`. The session was suspended by the user at this point. Working tree clean except the untracked `.vscode/` and `ProjectDefinitionPrompt.txt`; `main` in sync with `origin/main`.
 
 ## Status / gates
 - **Gate OPEN for phase 1.** Done, committed and pushed: 001, 009, 010, 012, 013 (+ follow-up `9ca4517`), 014 (`987fbd1`, docs `4752afd`), 006 (`b8ad00d`). Probe image builds; not flashed yet.
@@ -18,6 +18,7 @@ Task 006 (bus_task, probe console, `app_main`) accepted by the user and committe
 - Stage 2/3 specs only after the probe log is in `raw/` and captured.
 - Dev env: ESP-IDF v6.0.2 (`. ~/esp/esp-idf-v6.0.2/export.sh`); host target via `idf.py --preview set-target linux`; `libbsd-dev` user action pending (or `export CPATH="/home/szpikko/esp-host-stubs:$CPATH"`).
 - Untracked `.vscode/` and `ProjectDefinitionPrompt.txt` stay uncommitted.
+- Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrites them (`rtk` prefix); agents fall back to the Read tool. One host-test run was blocked this way earlier. User may want to check the RTK hook / permission settings.
 
 ## Next
 1. 011 (fake-slave host tests + end-to-end host tests, `tasks/README.md`; firmware-dev sonnet, then `build-verifier` and `firmware-reviewer`).
