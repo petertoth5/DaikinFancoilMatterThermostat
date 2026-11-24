@@ -288,3 +288,43 @@ No raw files added or changed. Session facts (local `git log` / `git status`, no
 - Next session starts with RESUME "Next" item 1: task 011 (fake-slave host tests and end-to-end host tests).
 - RESUME.md: last step, status (tooling note on RTK-rewritten read-only Bash calls being blocked for subagents), start prompt unchanged.
 - Not changed: `index.md`, concepts/, entities/, sources/, `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | Q-HW1 / Q-HW2 answered; task 011 in progress
+No raw files added or changed. User decision (session 2026-11-24, not in raw) and session facts (not in raw).
+- Q-HW1 answered: no oscilloscope and no logic analyser, on the bench or on site. 008 B.6 (DE timing) and D.8b (slave turnaround) are logged "not measured"; only console counters and timestamps are evidence.
+- Q-HW2 decided: defer. 008 B.6 "DE with concurrent flash/NVS activity" is not done in phase 1, repeat at phase-2 bring-up. No test console command added to the 006 image.
+- New residual risk: DE timing, incl. the load-bearing ISR-in-IRAM assumption, stays unmeasured in phase 1; re-check at phase-2 bring-up where possible (method without a scope still open).
+- Session facts: task 011 (fake-slave host tests) handed to `firmware-dev` (sonnet), in progress, not verified. The `architect` is finalising spec 008 with these answers (in parallel; `tasks/` not touched by the wiki-keeper).
+- concepts/firmware-architecture: section 8 Q-HW1/Q-HW2 moved from open to answered/decided (question text kept, answer + date added), new residual-risk bullet, "open after 006 acceptance" bullet updated; section 6 K5 row, 006 Q-HW2 note and V5 row annotated; section 7 new update paragraph (answers, 011 in progress, 008 being finalised).
+- concepts/project-goal: tasks line "Next" no longer lists Q-HW1/Q-HW2 as blocking. index.md summaries for project-goal and firmware-architecture updated.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | spec 008 finalised (F1–F4); task 011 implemented
+No raw files added or changed. User decisions (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24) and session facts (not in raw). Not committed.
+- Spec 008 finalised by the `architect` (session fact): Q-HW1/Q-HW2 applied (B.6 six DE timing items and D.8b turnaround "not measured (no instrument, Q-HW1)"; flash/NVS DE run "not done in phase 1, repeat at phase-2 bring-up (Q-HW2)"); indirect evidence (multimeter static DE level, multimeter averaged DE level during `mb probe`, complete OK replies + counters) recorded but not counted as pass; stale console texts aligned to `b8ad00d`. Awaiting user approval of the spec.
+- User decisions F1–F4: F1 heap/leak check after UART delete/re-install (008 B.5) "not checked (no heap output in the 006 image)" in phase 1, no 006 change; F2 exit item 6 answered by `dur_ms` plus derived upper bound (about `dur_ms` - 25 ms, "derived, not measured"), pure turnaround "unknown, no instrument", replaces 008-b (row annotated, not deleted); F3 new hard stop 008 B.6.b (averaged DE near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect; in `tasks/README.md` Escalations); F4 phase-2 DE re-check method decided later (section 8 open question).
+- Task 011 implemented by `firmware-dev` (sonnet), not yet verified: `fake_slave.{h,c}`, `test_e2e_poll.c`, fixtures `README.md`, `healthy-synthetic.log`, `starred-timeout-synthetic.log`; implementer reports host 137 / 0 / 0 (was 119), 0.04 s, 10 scenarios fail under mutation, no contradiction with spec 010, no component code changed (orchestrator `git status`). Deviation `fake_tag_last()` (`ps_link_fn` carries no request kind), pending review. `build-verifier` and `firmware-reviewer` running.
+- concepts/firmware-architecture: section 1 exit item 6 note (F2); section 6 rows 008-a and 008-b annotated, new subsection "Spec 008 finalisation (user, 2026-11-24)" (F1–F4); section 7 stale "needs Q-HW1/Q-HW2" texts annotated, new update paragraph, rows 008 and 011, order line; section 8 residual-risk bullet extended, new open question (F4), new hard stop (F3), open note on the 25 ms basis, "open after 006 acceptance" bullet updated.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
+- Open: phase-2 DE re-check method (F4); basis of the "about 25 ms" in F2 not in the session facts; 011 verification results; 008 spec approval.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 011 verified and reviewed; user decision on the major
+No raw files added or changed. Session facts (verified output, not in raw) and user decision (session 2026-11-24, not in raw). Not committed.
+- `build-verifier` on 011: PASS (host 137 / 0 / 0, 0 warnings, 2.2 s; esp32s3 0 warnings; lint rc 0, self-test 372; ELF required `mb_link_read`, `mb_rtu_build_fc03` present, forbidden 0; 0 fake/e2e symbols in the target ELF; no component/main code changed; IDF-only dependencies; clang-tidy skipped).
+- `firmware-reviewer` on 011: REQUEST CHANGES. Major: D16 gap rule asserted only in scenarios 1 and 6; five `poll_sched` gap mutations uncaught by the e2e tests (test-coverage gap, not a code fault). All 8 implementer deviations accepted. Minors m2–m6; informational: sweep-while-OFFLINE caught only by unit tests.
+- User decision: fix the major only (gap enforced in the fake on every request + asserted at the end of every scenario, proven with the uncaught mutations); m2–m6 stay open. Fix running with `firmware-dev` (sonnet); then re-check and user acceptance.
+- concepts/firmware-architecture: section 6 new subsection "Task 011 review decisions (user, 2026-11-24)"; section 7 new update paragraph, row 011 and order line annotated; section 8 new note (m5) for turning the 008 probe log into a fixture.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
+- Open: the two of the 8 accepted deviations not named in the session facts.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 011 accepted (`17825cb`); spec 008 approved
+No raw files added or changed. Session facts (verified output, not in raw) and user decisions (session 2026-11-24, not in raw). Not committed.
+- 011 gap major fixed by `firmware-dev` (sonnet): `fake_link` fails a request starting < `FAKE_DEFAULT_GAP_MS` (100 ms) after the previous request end (D16 end-to-start, first request exempt, no setter); `assert_gaps_respected` at the end of every scenario; new e2e cases 11a (MANUAL right after a request) and 11b (MANUAL right after the OFFLINE-entering failure). Implementer mutation proof (a)–(f) all caught.
+- `build-verifier` re-check PASS (host 139 / 0 / 0, 0 warnings, 2.1 s; components/ and main/ unchanged; lint rc 0, self-test 372; target build skipped). `firmware-reviewer` re-review APPROVE (re-ran (b), (d), (e): caught); new minor m7 (11b wait-for-OFFLINE loop has no iteration cap; test-suite only, no section 8 entry).
+- User decisions: task 011 accepted as is; m2–m7 stay open; spec 011 not amended (11a/11b and the in-fake gap rule recorded as extra scope beyond spec 011). Code committed as `17825cb`; push after the docs commit. Spec 008 approved; `firmware-dev` writing `docs/phase1-probe/checklist.md` and `measurement-log-template.md` (in progress), then `firmware-reviewer`.
+- concepts/firmware-architecture: section 6 deviation list completed (8 of 8; closes the earlier open "two deviations not named"), new subsections "Task 011 acceptance" (G1–G6) and "Spec 008 approval", major row and 008 status line annotated; section 7 new update paragraph, rows 008 and 011, order line; section 8 "open after 006 acceptance" bullet updated.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
+- Open: phase-2 DE re-check method (F4); basis of the "about 25 ms" (F2); 011 minors m2–m7; 013 row A14 doc minors.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.

@@ -25,7 +25,7 @@ No Matter, no Wi-Fi, FC03 only, write code compiled out (`CONFIG_DMT_BUS_WRITE=n
 3. Silence check saw no foreign traffic on "A A B B -" (tests the inferred "panel is slave", [[entities/ekwhctrl1]]).
 4. Table of **every** documented register, starred and unstarred (p4, [[concepts/register-map]]): OK with raw/scaled value, or exception + code, or timeout.
 5. Does FC03 with quantity > 1 work (e.g. 200..203 qty 4)? Not stated in the manual ([[concepts/modbus-rs485-link]]).
-6. Response time min/median/max over ≥ 1000 transactions.
+6. Response time min/median/max over ≥ 1000 transactions. *(2026-11-24, user decision, session 2026-11-24, section 6 "Spec 008 finalisation" F2: answered by the whole-transaction time `dur_ms` plus a derived upper bound for the slave turnaround (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument".)*
 7. ≥ 1 h polling at the proposed rate (section 3), error rate < 1 %, no panel anomaly (display, icons, error codes, local keys).
 8. Local keypress correlation: setpoint up/down (231 vs 008), each fan mode (order of 201 bits 0–2), season (233 values 3/5), standby (201 bit 7).
 9. Does the panel show anything when polled (e.g. WEB icon, 247 flag 0, [[concepts/web-restriction-flags]])?
@@ -375,8 +375,8 @@ Spec 008 (on-site, amended by the architect; section 8 and `tasks/008`):
 
 | # | Topic | Decision |
 |---|---|---|
-| 008-a | DE scope on site | Check DE at boot, at open, per transaction, with concurrent flash/NVS activity, at the silence check, and at close |
-| 008-b | Slave turnaround | Measure the slave turnaround on site |
+| 008-a | DE scope on site | Check DE at boot, at open, per transaction, with concurrent flash/NVS activity, at the silence check, and at close. *(Update 2026-11-24: no instrument (Q-HW1), the six DE timing items are "not measured"; the flash/NVS run is deferred to phase 2 (Q-HW2); section 6 "Spec 008 finalisation")* |
+| 008-b | Slave turnaround | Measure the slave turnaround on site. ***Replaced 2026-11-24** (user decision, session 2026-11-24) by F2 in "Spec 008 finalisation" below: `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, "derived, not measured"); pure turnaround "unknown, no instrument"* |
 | 008-c | No slave | No answering slave gives **TIMEOUT** (checked on site) |
 | 008-d | End-of-frame wait | The **10–20 ms** end-of-frame wait is **accepted** (known limit, section 3) |
 
@@ -390,7 +390,7 @@ User decision in the session of 2026-11-24, not in raw (user decision, session 2
 | K2 | Verification | `build-verifier` PASS: fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a` built; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0 |
 | K3 | Re-review | `firmware-reviewer` re-review of the fix: **APPROVE** |
 | K4 | Acceptance | **Accepted 2026-11-24** (user). Committed and pushed as `987fbd1` ("Add rs485_port and mb_link FC03 read path over own RTU codec (task 014)") |
-| K5 | Not verified on hardware | The DE and ISR facts (rows in section 4) remain project evidence from the IDF source; on-board checks are in task 008 (open questions Q-HW1 / Q-HW2, section 8) |
+| K5 | Not verified on hardware | The DE and ISR facts (rows in section 4) remain project evidence from the IDF source; on-board checks are in task 008 (Q-HW1 / Q-HW2 answered 2026-11-24: no scope, flash/NVS run deferred to phase 2; section 8) |
 
 ### Task 006 review decisions (user, 2026-11-24)
 
@@ -410,7 +410,7 @@ Fix all minors before commit (user):
 
 Verification at implementation (session facts, verified output, not in raw): `build-verifier` PASS: fresh esp32s3 build 0 warnings; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: mb_link_read, mb_rtu_build_fc03 present`; image 236 KB, 77% of the app partition free; no Wi-Fi, lwip, netif, BT or Matter code linked (`nvs_flash` and `esp_phy` members are force-included by the IDF startup, not used by project code); host 118 / 0 / 0; no dependency added. `firmware-reviewer`: boot order, single-owner rule, non-blocking output, console-off-bus-UART guard and timing loop verified.
 
-The 006 image has no flash/NVS load command, so Q-HW2 (section 8) stays open.
+The 006 image has no flash/NVS load command, so Q-HW2 (section 8) stays open. *(Update 2026-11-24: Q-HW2 decided, defer; no command added, section 8.)*
 
 ### Task 006 acceptance (user, 2026-11-24)
 
@@ -422,7 +422,76 @@ User decision in the session of 2026-11-24, not in raw (user decision, session 2
 | V2 | Verification | `build-verifier` PASS: fresh esp32s3 build 0 warnings; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: mb_link_read, mb_rtu_build_fc03 present`; guard proof: a build with a missing required symbol fails; image 236819 bytes, about 77 % of the 1 MB app partition free; no Wi-Fi, lwip, netif, BT or Matter code linked; host 119 Tests, 0 Failures (new `poll_sched` cancel-manual test passes). No dependency added |
 | V3 | Re-review | `firmware-reviewer` re-review: **APPROVE**. Minor (shared status text): spec aligned to the code |
 | V4 | Acceptance | **Accepted 2026-11-24** (user). Firmware committed and pushed as `b8ad00d` ("Add bus_task, mb probe console and app_main (task 006)") |
-| V5 | Not verified on hardware | This is the **first flashable phase-1 probe image**; it has not been run on hardware yet. The `bus_task` 4 KB stack is still to be verified on site (section 8). Q-HW1 and Q-HW2 stay open (section 8) |
+| V5 | Not verified on hardware | This is the **first flashable phase-1 probe image**; it has not been run on hardware yet. The `bus_task` 4 KB stack is still to be verified on site (section 8). Q-HW1 and Q-HW2 stay open (section 8); *answered 2026-11-24, section 8* |
+
+### Spec 008 finalisation (user, 2026-11-24)
+
+Session facts, not in raw: the `architect` finalised spec 008 (`tasks/008-p1-bringup-hil-checklist.md`, not touched by the wiki-keeper) on 2026-11-24:
+- Q-HW1 and Q-HW2 (section 8) applied: the six DE timing items of B.6 and the D.8b turnaround are "not measured (no instrument, Q-HW1)"; the flash/NVS DE run is "not done in phase 1, repeat at phase-2 bring-up (Q-HW2)".
+- Indirect evidence is recorded but **not counted as a pass**: multimeter static DE level; multimeter averaged DE level during `mb probe`; complete OK replies plus counters.
+- Stale console texts aligned to the accepted 006 code `b8ad00d`, e.g. `faults since boot`; `mb silence` judged by its result lines, not by `mb status`; `mb stats` has no health field; `mb status` has no heap output.
+
+The user's answers to the architect's four questions (user decision, session 2026-11-24, not in raw):
+
+| # | Topic | Decision |
+|---|---|---|
+| F1 | Heap/leak check after UART driver delete/re-install (008 B.5) | Accepted as "not checked (no heap output in the 006 image)" in phase 1; no change to 006 |
+| F2 | Phase-1 exit item 6, response time (section 1) | Answered by the whole-transaction time `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument". **Replaces 008-b** ("measure the slave turnaround on site", Task 014 review decisions above) |
+| F3 | New hard stop (008 B.6.b) | Multimeter averaged DE level near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect. Approved; listed in the Escalations of `tasks/README.md` (session fact) |
+| F4 | Phase-2 DE re-check method without an instrument | Decide later; open question before the phase-2 specs (section 8) |
+
+Status: spec 008 finalised 2026-11-24, **awaiting user approval of the spec** (session fact). *(Update 2026-11-24: approved by the user; docs in progress, see "Spec 008 approval" below.)* The basis of the "about 25 ms" figure in F2 is not stated in the session facts given to the wiki-keeper (open, see section 8).
+
+### Task 011 review decisions (user, 2026-11-24)
+
+Sources: session facts, verified output, not in raw (`build-verifier`, `firmware-reviewer`); user decision, session 2026-11-24. Task 011 = fake-slave host tests (section 7).
+
+**`build-verifier` on 011: PASS** (session facts, verified output, not in raw): fresh host build 0 warnings (`-Werror`), `137 Tests 0 Failures 0 Ignored`, OK, exit 0, 2.2 s; fresh esp32s3 build 0 warnings; bus-access lint rc 0, self-test 372 ok; ELF `ok: forbidden 0 found; required: mb_link_read,mb_rtu_build_fc03 present`; 0 fake/e2e symbols in the target ELF; no firmware component or `main` code changed; dependencies only IDF (no registry components, no esp-modbus); clang-tidy SKIPPED (not installed).
+
+**`firmware-reviewer` on 011: REQUEST CHANGES** (session facts, not in raw).
+
+| ID | Finding | Decision (user, session 2026-11-24) |
+|---|---|---|
+| Major | The >= 100 ms gap rule (D16, section 3 "Timing") is asserted only in scenarios 1 and 6. In a scratch copy, `poll_sched` mutations were **not caught by any e2e test**: gap skipped for RETRY, for MANUAL, while OFFLINE; gap not recorded after RETRY or HEALTH. The real `poll_sched` code is not at fault; this is a **test-coverage gap**. Caught by the e2e tests: no RETRY, backoff, probe interval, `offline_after` 6, POLL while OFFLINE, recovery, LATCHED accepting MANUAL/SWEEP, gap 50 ms, SWEEP gap | **Fix now:** enforce the gap in the fake on every request and assert it at the end of every scenario; prove the fix with the previously uncaught mutations. Fix with `firmware-dev` (sonnet), running; then `build-verifier` + `firmware-reviewer` re-check, then user acceptance. *Done 2026-11-24: "Task 011 acceptance" below* |
+| Deviations (8) | Implementer deviations (full list below), incl. `fake_tag_last()` (`ps_link_fn` carries no request kind), unconfigured registers -> exception 02, scenario 2/3 assertion forms, replay latency = `dur_ms` incl. TIMEOUT, fixtures use SWEEP with dummy times, `mkstemp` under `/tmp` | **All 8 accepted** by the reviewer |
+| m2 | Scenario 10a never runs `poll_step` before the 5000 ms window, so polling in STOPPED would pass | **Open**, not fixed |
+| m3 | An untagged request defaults to kind 0, so the qty > 1 / non-MANUAL check relies on the rig calling `fake_tag_last` | **Open**, not fixed |
+| m4 | Temp files leak under `/tmp` if a test fails between `mkstemp` and `unlink` | **Open**, not fixed |
+| m5 | `FAKE_REPLAY_MAX` 512 may be exceeded by a real on-site 008 log (`fake_load_log` returns -1); fixtures README lacks notes that replay keys on (addr, reg, qty) and ignores kind / `t_start` | **Open**, not fixed (relevant when the 008 probe log becomes a fixture, section 8) |
+| m6 | No explicit "no RETRY after RETRY" assertion in scenario 2 | **Open**, not fixed |
+| Info | Sweep while OFFLINE (rule 8) is caught only by the `poll_sched` unit tests, not by the e2e tests | No action recorded |
+
+The 8 accepted implementer deviations (session facts, not in raw; completed 2026-11-24, earlier only six were named here):
+
+| # | Deviation (accepted by the reviewer) |
+|---|---|
+| 1 | `fake_tag_last()`: the rig tags the last request with its kind, because `ps_link_fn` carries no request kind |
+| 2 | Unconfigured registers answer exception 02 |
+| 3 | Scenario 2 asserted as: the k-th POLL at >= k*60 s, <= 3 POLLs, each POLL followed by one RETRY |
+| 4 | Scenario 3: recovery bound 200 s + 30 s + 500 ms + 25 ms; while OFFLINE only HEALTH on 000; probe spacing >= 30 s from the previous probe end / the OFFLINE-entering failure |
+| 5 | "Unstarred fresh" read as the polled (FAST/SLOW) unstarred registers |
+| 6 | Replay latency = `dur_ms`, including TIMEOUT |
+| 7 | Fixtures use SWEEP with dummy times |
+| 8 | `mkstemp` under `/tmp` in scenarios 8c and 9 |
+
+### Task 011 acceptance (user, 2026-11-24)
+
+Sources: session facts, verified output, not in raw (`firmware-dev`, `build-verifier`, `firmware-reviewer`); user decision, session 2026-11-24.
+
+| # | Item | Content |
+|---|---|---|
+| G1 | Major fix (`firmware-dev`, sonnet) | `fake_link` fails the test if a request starts < `FAKE_DEFAULT_GAP_MS` (100 ms) after the end of the previous request (end-to-start, D16, section 3 "Timing"); the first request is exempt; no setter, all scenarios use 100 ms. `assert_gaps_respected` runs at the end of every scenario. New e2e cases **11a** (MANUAL requested right after a request) and **11b** (MANUAL right after the failure that enters OFFLINE) |
+| G2 | Mutation proof (implementer) | All caught: (a) RETRY gap skipped, (b) MANUAL gap skipped, (c) gap not recorded after RETRY, (d) not recorded after HEALTH, (e) gap skipped while OFFLINE, (f) gap 50 ms. 11a/11b are the only e2e tests that catch "gap skipped for MANUAL" and "gap skipped while OFFLINE" |
+| G3 | `build-verifier` re-check | **PASS**: fresh host build 0 warnings, `139 Tests 0 Failures 0 Ignored`, OK, exit 0, 2.1 s; `components/` and `main/` unchanged; bus-access lint rc 0, self-test 372; target build skipped (no firmware change) |
+| G4 | `firmware-reviewer` re-review | **APPROVE**. Independently re-ran mutations (b), (d), (e): all caught. Every return path of `fake_link` updates `last_end_ms`; the `>= 100` boundary matches `poll_sched`. New minor **m7**: the wait-for-OFFLINE loop in 11b has no iteration cap, so a regression would hang the suite instead of failing it. The reviewer recommended amending spec 011 for scenario 11 |
+| G5 | Acceptance | **Task 011 accepted as is, 2026-11-24** (user). Minors m2–m6 and m7 stay open. Code committed as `17825cb` ("Add fake slave and end-to-end poll tests with fixtures (task 011)"); push follows after the docs commit (session fact) |
+| G6 | Spec 011 not amended (user) | Scenarios 11a/11b and the in-fake gap rule are **recorded extra scope beyond spec 011**, not a spec deviation. A later review should not flag them as unspecified |
+
+m7 is test-suite robustness only; it does not affect on-site use, so it has no section 8 entry *(inferred)*.
+
+### Spec 008 approval (user, 2026-11-24)
+
+Spec 008 (section "Spec 008 finalisation" above) was **approved by the user on 2026-11-24** (user decision, session 2026-11-24, not in raw). `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md` (in progress, session fact); then `firmware-reviewer`, then user acceptance.
 
 ### Recorded conflict (D19)
 
@@ -442,11 +511,19 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 
 **Update 2026-11-24, task 014 implemented and verified (session facts, verified output, not in raw; not committed):** `firmware-dev` (sonnet) implemented `rs485_port` + `mb_link` (own FC03 RTU master over the IDF UART in RS485 half-duplex, DE via RTS). No escalation condition of spec 014 was hit. `build-verifier` PASS: fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a` built; bus-access lint 372 and ELF self-tests 32; ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0; no dependency added. `firmware-reviewer`: **APPROVE WITH MINORS**. The reviewer verified the DE and ISR facts in the local IDF v6.0.2 source (section 4, project evidence) and found that no reply byte can be lost to the ISR RX-FIFO reset. The load-bearing point is `CONFIG_UART_ISR_IN_IRAM=y` (section 3). **User decisions (2026-11-24):** fix minors M1–M4 now, then re-check, accept and commit; 006 and 008 specs amended (section 6 "Task 014 review decisions"). **Status: M1–M4 in progress (`firmware-dev`), not yet re-checked.** Open: the reviewer's full minor text is not in the wiki (M3 reason).
 
-**Update 2026-11-24, task 014 accepted (session facts, verified output, not in raw; pushed as `987fbd1`):** the M1–M4 fixes (section 6 "Task 014 review decisions") were applied by `firmware-dev` (sonnet), re-checked by `build-verifier` (PASS, see section 6 "Task 014 acceptance", K2) and the `firmware-reviewer` re-review (APPROVE). **User accepted task 014 on 2026-11-24**; the firmware is committed and pushed as `987fbd1`. **Task 014 done.** Next: 006 (bus_task, probe console, `app_main`; firmware-dev sonnet, then build-verifier and firmware-reviewer), 011 (can run in parallel), then 008. Task 008 needs the user's answers to open questions Q-HW1 and Q-HW2 (section 8).
+**Update 2026-11-24, task 014 accepted (session facts, verified output, not in raw; pushed as `987fbd1`):** the M1–M4 fixes (section 6 "Task 014 review decisions") were applied by `firmware-dev` (sonnet), re-checked by `build-verifier` (PASS, see section 6 "Task 014 acceptance", K2) and the `firmware-reviewer` re-review (APPROVE). **User accepted task 014 on 2026-11-24**; the firmware is committed and pushed as `987fbd1`. **Task 014 done.** Next: 006 (bus_task, probe console, `app_main`; firmware-dev sonnet, then build-verifier and firmware-reviewer), 011 (can run in parallel), then 008. Task 008 needs the user's answers to open questions Q-HW1 and Q-HW2 (section 8). *(Update 2026-11-24: answered; spec 008 finalised 2026-11-24 applying them and decisions F1–F4, awaiting user approval of the spec; section 6 "Spec 008 finalisation".)*
 
-**Update 2026-11-24, task 006 accepted (session facts, verified output, not in raw):** T1–T7 applied (section 6 "Task 006 acceptance", V1–V2), `firmware-reviewer` re-review APPROVE. **User accepted task 006 on 2026-11-24**; the firmware is committed and pushed as `b8ad00d`. **Task 006 done.** It is the first flashable phase-1 probe image; it has not been run on hardware. Next: 011 (fake-slave host tests, firmware-dev sonnet), then 008 (on-site checklist, needs Q-HW1 / Q-HW2). The on-site probe by the user follows, then the probe log goes into `raw/` for `/capture`.
+**Update 2026-11-24, task 006 accepted (session facts, verified output, not in raw):** T1–T7 applied (section 6 "Task 006 acceptance", V1–V2), `firmware-reviewer` re-review APPROVE. **User accepted task 006 on 2026-11-24**; the firmware is committed and pushed as `b8ad00d`. **Task 006 done.** It is the first flashable phase-1 probe image; it has not been run on hardware. Next: 011 (fake-slave host tests, firmware-dev sonnet), then 008 (on-site checklist, needs Q-HW1 / Q-HW2). *(Update 2026-11-24: 008 finalised 2026-11-24 applying Q-HW1/Q-HW2 and F1–F4, awaiting user approval of the spec.)* The on-site probe by the user follows, then the probe log goes into `raw/` for `/capture`.
+
+**Update 2026-11-24, Q-HW1 / Q-HW2 answered, 011 started (user decision and session facts, session 2026-11-24, not in raw):** Q-HW1: no scope or logic analyser (008 B.6 DE timing and D.8b turnaround "not measured"); Q-HW2: defer the flash/NVS DE run to phase-2 bring-up, no test command in 006 (section 8). Task 011 (fake-slave host tests) handed to `firmware-dev` (sonnet), **in progress, not verified**. The `architect` is finalising spec 008 with these answers *(update 2026-11-24: finalised, awaiting user approval, update below)*. Next: 011 verification (`build-verifier`, `firmware-reviewer`, user acceptance), then the finalised 008 spec for user review.
 
 **Update 2026-11-24, task 006 implemented and verified, minors in progress (session facts, verified output, not in raw; not committed):** `firmware-dev` (sonnet) implemented `bus_task` (single owner of the bus), the probe console `mb ...` and `app_main`: the first flashable probe image. `build-verifier` PASS and `firmware-reviewer` APPROVE WITH MINORS (details and checks in section 6 "Task 006 review decisions", T1–T7). The user decided to fix all minors before commit. **Next:** the architect amends specs 006, 008 and 010 (running); then `firmware-dev` applies T1–T6, then `build-verifier` and `firmware-reviewer` again, then user acceptance; commit only on request. Then 011 and 008. **`bus_task` stack of 4 KB** is not yet proven: it is checked on site (section 8).
+
+**Update 2026-11-24, 008 spec finalised, 011 implemented (session facts and user decisions, session 2026-11-24, not in raw; not committed):** the `architect` finalised spec 008 with Q-HW1/Q-HW2 applied and the console texts aligned to `b8ad00d`; the user answered the architect's four questions (section 6 "Spec 008 finalisation", F1–F4; F2 replaces 008-b). **008 now awaits the user's approval of the spec.** Task 011 was implemented by `firmware-dev` (sonnet): `firmware/test/host/main/fake_slave.{h,c}`, `test_e2e_poll.c`, fixtures `firmware/test/fixtures/{README.md,healthy-synthetic.log,starred-timeout-synthetic.log}`. Implementer report (not yet independently verified): host 137 Tests, 0 Failures, 0 Ignored (was 119), 0.04 s; all 10 scenarios fail under deliberate mutation; no contradiction with spec 010; no firmware component code changed (orchestrator confirmed via `git status`). Deviation, pending review: `fake_tag_last()` added because `ps_link_fn` carries no request kind. **Status: 011 implemented, not yet verified**; `build-verifier` and an independent `firmware-reviewer` are running. Next: 011 verification results -> user acceptance; user approves the 008 spec -> `firmware-dev` writes the docs -> `firmware-reviewer`; then flash and the bench/on-site probe. *(Update 2026-11-24: 011 verified, review REQUEST CHANGES, update below.)*
+
+**Update 2026-11-24, task 011 verified and reviewed (session facts, verified output, not in raw; user decision, session 2026-11-24; not committed):** `build-verifier` **PASS** (host 137 / 0 / 0, 0 warnings, 2.2 s; esp32s3 0 warnings; lint 372 ok; ELF required `mb_link_read`, `mb_rtu_build_fc03` present; 0 fake/e2e symbols in the target ELF; no component code changed). `firmware-reviewer` **REQUEST CHANGES**: one major (D16 gap rule asserted only in scenarios 1 and 6; five `poll_sched` gap mutations not caught by any e2e test; test-coverage gap, not a code fault); all 8 implementer deviations accepted (incl. `fake_tag_last()`); minors m2–m6 (section 6 "Task 011 review decisions"). **User decision:** fix the major only (gap enforced in the fake on every request + asserted at the end of every scenario, proven with the uncaught mutations); **minors m2–m6 stay open**. **Status: 011 major fix in progress** (`firmware-dev`, sonnet); then `build-verifier` + `firmware-reviewer` re-check, then user acceptance. 008 spec still awaits user approval. *(Update 2026-11-24: fix done, 011 accepted, `17825cb`; 008 approved; update below.)*
+
+**Update 2026-11-24, task 011 accepted, spec 008 approved (session facts, verified output, not in raw; user decision, session 2026-11-24):** the gap major is fixed (gap enforced in `fake_link` on every request, asserted at the end of every scenario, new e2e cases 11a/11b beyond spec 011); `build-verifier` re-check PASS (host 139 / 0 / 0, 0 warnings); `firmware-reviewer` re-review **APPROVE** with one new minor m7 (section 6 "Task 011 acceptance", G1–G6). **User accepted task 011 as is**; minors m2–m7 stay open; spec 011 not amended (11a/11b and the in-fake gap rule are recorded extra scope). Code committed as `17825cb`; push after the docs commit. **Task 011 done.** **Spec 008 approved by the user**; `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md`, then `firmware-reviewer`, then user acceptance. Then the user flashes the probe image (bench items) and runs the on-site probe.
 
 | Task | Change |
 |---|---|
@@ -460,17 +537,24 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 | 005 | retire (RX-only listen survives as the silence check in `rs485_port`) |
 | 006 | modify: poll loop + probe console (`bus_task`, `mb` console, `app_main`; first flashable probe image). **Done, accepted 2026-11-24, committed and pushed as `b8ad00d`** (section 6 "Task 006 review decisions" T1–T7 and "Task 006 acceptance" V1–V5); `firmware-reviewer` APPROVE WITH MINORS, re-review APPROVE; not yet run on hardware |
 | 007 | retire, replaced by 011 |
-| 008 | modify: on-site probe checklist + log template, items 1–11 (section 1) |
+| 008 | modify: on-site probe checklist + log template, items 1–11 (section 1). **Spec finalised 2026-11-24** (Q-HW1/Q-HW2 applied, console texts aligned to `b8ad00d`, F1–F4 in section 6 "Spec 008 finalisation"); ~~awaiting user approval of the spec~~ **spec approved by the user 2026-11-24**; docs `docs/phase1-probe/checklist.md` and `measurement-log-template.md` **in progress** (`firmware-dev`, sonnet), then `firmware-reviewer` and user acceptance (section 6 "Spec 008 approval") |
 | 009 | new: `daikin_regs` |
 | 010 | new: `reg_model` + `poll_sched` |
-| 011 | new: fake-slave host tests |
+| 011 | new: fake-slave host tests. **Implemented 2026-11-24, not yet verified** (`build-verifier` and `firmware-reviewer` running; update below). *2026-11-24: `build-verifier` PASS (137 / 0 / 0); `firmware-reviewer` REQUEST CHANGES (1 major: D16 gap coverage; 8 deviations accepted; minors m2–m6 open by user decision); major fix in progress, then re-check and user acceptance (section 6 "Task 011 review decisions")*. **Done, accepted as is 2026-11-24, committed as `17825cb`** (push after the docs commit); host 139 / 0 / 0; re-review APPROVE; minors m2–m7 open; 11a/11b and the in-fake gap rule are extra scope beyond spec 011, spec not amended (section 6 "Task 011 acceptance") |
 
-Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 (done, accepted 2026-11-24, pushed as `b8ad00d`) -> 008; 011 any time**. Next: 011, then 008. *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
+Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 (done, accepted 2026-11-24, pushed as `b8ad00d`) -> 008; 011 any time**. Next: 011, then 008. *(Update 2026-11-24: 011 implemented, verification running; 008 spec finalised, awaiting user approval.)* *(Update 2026-11-24: 011 review REQUEST CHANGES, major fix in progress, minors m2–m6 open.)* *(Update 2026-11-24: 011 done, accepted, committed `17825cb`; 008 spec approved, docs in progress. Next: 008 docs -> `firmware-reviewer` -> user acceptance -> commit; then flash the probe image, bench items, on-site probe.)* *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
 
 ## 8. Open items and risks
 
-- **Open question Q-HW1 (new 2026-11-24, for the user; answer before task 008 is finalised):** is an oscilloscope or logic analyser available on the bench or on site? Needed for `tasks/008` B.6 (DE level on a scope) and D.8b (slave turnaround). If not, these are logged as **"not measured"** in the probe log (session facts 2026-11-24, not in raw).
-- **Open question Q-HW2 (new 2026-11-24, for the user; answer before task 008 is finalised):** the phase-1 image cannot generate flash/NVS load, so the `tasks/008` B.6 run "DE with concurrent flash/NVS activity" is **not done in phase 1; repeat at phase-2 bring-up**, unless the user wants a test console command added to task 006 for it (user to decide; session facts 2026-11-24, not in raw).
+- **Question Q-HW1 (asked 2026-11-24; answered 2026-11-24):** is an oscilloscope or logic analyser available on the bench or on site? Needed for `tasks/008` B.6 (DE level on a scope) and D.8b (slave turnaround). If not, these are logged as **"not measured"** in the probe log (session facts 2026-11-24, not in raw).
+  **Answer (user decision, session 2026-11-24, not in raw):** **no** oscilloscope and **no** logic analyser, neither on the bench nor on site. Consequence: 008 B.6 (DE timing) and D.8b (slave turnaround) are logged **"not measured"**; only console counters and timestamps are evidence.
+- **Question Q-HW2 (asked 2026-11-24; decided 2026-11-24):** the phase-1 image cannot generate flash/NVS load, so the `tasks/008` B.6 run "DE with concurrent flash/NVS activity" is **not done in phase 1; repeat at phase-2 bring-up**, unless the user wants a test console command added to task 006 for it (session facts 2026-11-24, not in raw).
+  **Decision (user decision, session 2026-11-24, not in raw):** **defer.** 008 B.6 "DE with concurrent flash/NVS activity" is "not done in phase 1, repeat at phase-2 bring-up". No test console command is added to the 006 image.
+- **Residual risk (new 2026-11-24, from the Q-HW1 / Q-HW2 answers):** DE timing stays **unmeasured in phase 1**, including the load-bearing assumption that the TX_DONE ISR runs from IRAM (`CONFIG_UART_ISR_IN_IRAM=y`, build guard M2, section 3; risk bullet below). Phase-1 evidence for DE and slave turnaround is limited to console counters and timestamps. Re-check DE timing (incl. under flash/NVS load) at phase-2 bring-up where possible; without a scope or logic analyser the method for that re-check is still open *(inferred; user decision, session 2026-11-24)*. Indirect phase-1 evidence (multimeter static and averaged DE level, complete OK replies + counters) is recorded but not counted as a pass (spec 008 finalised, section 6 "Spec 008 finalisation").
+- **Open question (before the phase-2 specs; user decision F4, session 2026-11-24):** how is DE timing (incl. under flash/NVS load) re-checked at phase-2 bring-up without a scope or logic analyser? Decide later.
+- **Hard stop (new 2026-11-24, 008 B.6.b, F3; user decision, session 2026-11-24):** a multimeter averaged DE level near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect.
+- **Note for turning the 008 probe log into a fixture (task 011 minor m5, open; session facts, not in raw; user decision, session 2026-11-24):** the fake slave holds at most `FAKE_REPLAY_MAX` = 512 replay entries; a real on-site 008 log may exceed this, and `fake_load_log` then returns -1. Replay keys on (addr, reg, qty) and ignores the request kind and `t_start`; the fixtures README does not say so yet. Check both before using the probe log as a replay fixture (section 6 "Task 011 review decisions").
+- **Open (wiki-keeper note):** the basis of the "about 25 ms" subtracted from `dur_ms` in F2 (section 6) is not in the session facts given to the wiki; ask the architect.
 - "Panel is slave" is inferred ([[entities/ekwhctrl1]]); if the silence check sees traffic or the panel never answers -> stop, back to the architect.
 - Starred registers may be unavailable (no water temperature, no STAT, no OUT) ([[concepts/register-map]]).
 - Not stated in the manual: port of the address, "Address 001 – leave free" vs default 1, timing, exception codes, write endurance, panel behaviour without polling (the 300 s timeout is probably irrelevant here, *inferred*, [[concepts/flag-registers]]).
@@ -488,7 +572,7 @@ Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committ
 - **Risk (new 2026-11-24, task 014 review):** a flash or NVS stall (Matter activity) during our transmit can delay the DE release if the TX_DONE ISR is not in IRAM, and DE then stays high on the shared line. Mitigation: `CONFIG_UART_ISR_IN_IRAM=y` with build guard M2 (section 3); concurrent flash/NVS activity is one of the DE checks on site (task 008, section 6 "Task 014 review decisions") *(inferred mechanism; reviewer, project evidence)*.
 - **Risk (new 2026-11-24, task 014):** `gap_bytes` and `max_byte_interval_us` are approximate (M3). Quote them only as bounds in the probe log.
 - **Risk (new 2026-11-24, task 006; still open after acceptance):** the `bus_task` stack of 4 KB is not yet proven. Keep it as a to-verify risk: check on site with the stack high-water mark after boot and after `mb silence 1` (task 008 reviewer check, section 6 "Task 006 review decisions" T7); if the margin is too small, the stack size is a new user decision *(session facts, not in raw)*.
-- **Open (2026-11-24, after 006 acceptance):** the probe image has not run on hardware. Q-HW1 and Q-HW2 remain open (above).
+- **Open (2026-11-24, after 006 acceptance):** the probe image has not run on hardware. *(Q-HW1 and Q-HW2 answered 2026-11-24, above. Update 2026-11-24: spec 008 finalised with these answers, awaiting user approval; section 6 "Spec 008 finalisation". Update 2026-11-24: spec 008 approved, docs in progress; section 6 "Spec 008 approval".)*
 - RMW race on 201 accepted.
 - How Matter ecosystems render the Fan endpoint *(external)*.
 - `CONFIG_UART_ISR_IN_IRAM`: resolved 2026-11-09, kept (section 6).

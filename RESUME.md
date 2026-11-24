@@ -6,25 +6,27 @@ Update after EVERY step. Keep short.
 Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, connecting to the Daikin EKWHCTRL1 **"A A B B -" Modbus RTU port** (nothing else connected there). Node = **sole Modbus master** (FC03 polling, FC06 only on Matter commands); staged phasing: 1 on-site read probe -> 2 Matter read-only mirror -> 3 Matter writes (write code compiled out until 3). User decisions 2026-11-08. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
 
 ## Last step (2026-11-24)
-Task 006 (bus_task, probe console, `app_main`) accepted by the user and committed and pushed as `b8ad00d`. Review fixes T1–T7 applied and verified (`build-verifier` PASS, `firmware-reviewer` re-review APPROVE). This is the first flashable phase-1 probe image; it has not been run on hardware. Wiki: firmware-architecture section 6 "Task 006 acceptance", sections 7 and 8, project-goal, index, log. The 006 spec and wiki docs were committed and pushed as `564fcc5`. The session was suspended by the user at this point. Working tree clean except the untracked `.vscode/` and `ProjectDefinitionPrompt.txt`; `main` in sync with `origin/main`.
+- Task 011 gap major fixed (gap enforced in `fake_link` on every request, asserted per scenario; new e2e 11a/11b, extra scope beyond spec 011, spec not amended). `build-verifier` PASS (host 139/0/0, 0 warnings); `firmware-reviewer` re-review APPROVE (new minor m7: 11b loop has no iteration cap).
+- User accepted 011 as is; code committed as `17825cb` (push after the docs commit).
+- User approved spec 008; `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md`.
+- Wiki updated (firmware-architecture section 6 "Task 011 acceptance", full 8-deviation list, "Spec 008 approval"; sections 7/8; project-goal, index, log). Docs not committed.
 
 ## Status / gates
 - **Gate OPEN for phase 1.** Done, committed and pushed: 001, 009, 010, 012, 013 (+ follow-up `9ca4517`), 014 (`987fbd1`, docs `4752afd`), 006 (`b8ad00d`). Probe image builds; not flashed yet.
-- **Open questions for the user (firmware-architecture section 8, answer before task 008 is finalised):**
-  - Q-HW1: oscilloscope or logic analyser on the bench or on site? Needed for 008 B.6 (DE) and D.8b (slave turnaround); otherwise logged "not measured".
-  - Q-HW2: the phase-1 image cannot generate flash/NVS load, so 008 B.6 "DE with concurrent flash/NVS" is "not done in phase 1, repeat at phase-2 bring-up" unless a test console command is added.
+- **011 done**, committed `17825cb` (not yet pushed; push after the docs commit).
+- **008 spec approved 2026-11-24; docs in progress** (`firmware-dev`), then `firmware-reviewer`.
+- Open: phase-2 DE re-check method without instrument (section 8, before phase-2 specs); basis of the "~25 ms" in F2 not recorded in wiki (ask architect); 011 minors m2–m7 (m5 matters when the 008 log becomes a fixture: `FAKE_REPLAY_MAX` 512, replay keys on addr/reg/qty); 013 doc minors (firmware-architecture section 6 row A14).
 - To verify on site: `bus_task` 4 KB stack (high-water after boot and after `mb silence 1`).
-- Open doc minors from the 013 follow-up (firmware-architecture section 6 row A14, not fixed): (a) FIFO rule bypassable with `;` in a comment or string in the `REG_*` argument list; (b) R5 `_second_argument` on 5000x `uart_set_mode(` takes over 60 s; (c) optional self-test for an unterminated `/*`.
 - Stage 2/3 specs only after the probe log is in `raw/` and captured.
 - Dev env: ESP-IDF v6.0.2 (`. ~/esp/esp-idf-v6.0.2/export.sh`); host target via `idf.py --preview set-target linux`; `libbsd-dev` user action pending (or `export CPATH="/home/szpikko/esp-host-stubs:$CPATH"`).
 - Untracked `.vscode/` and `ProjectDefinitionPrompt.txt` stay uncommitted.
-- Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrites them (`rtk` prefix); agents fall back to the Read tool. One host-test run was blocked this way earlier. User may want to check the RTK hook / permission settings.
+- Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrites them (`rtk` prefix); agents fall back to the Read tool.
 
 ## Next
-1. 011 (fake-slave host tests + end-to-end host tests, `tasks/README.md`; firmware-dev sonnet, then `build-verifier` and `firmware-reviewer`).
-2. 008 (on-site probe checklist and log template, incl. 006 reviewer checks T7); needs answers to Q-HW1 and Q-HW2 first.
-3. User flashes the probe image and runs the bench items; then the on-site probe (DE scope at boot, open, per transaction, concurrent flash/NVS, silence check, close; slave turnaround; no-slave -> TIMEOUT; `bus_task` stack high-water).
-4. Probe log into `Knowledgebase/raw/`, then `/capture`; `architect` writes phase-2 specs after that.
+1. 008 docs (`firmware-dev`) -> `firmware-reviewer` -> user acceptance -> commit.
+2. Flash the probe image; bench items (DE/turnaround "not measured"; hard stop on averaged DE near 3.3 V during `mb probe`).
+3. On-site probe (`dur_ms` + derived bound; `bus_task` stack high-water).
+4. Probe log into `Knowledgebase/raw/`, then `/capture`; then `architect` writes phase-2 specs.
 
 ## Start prompt (copy/paste into a fresh session in this repo; orchestrator is the default agent, else run `claude --agent orchestrator`)
 ```
