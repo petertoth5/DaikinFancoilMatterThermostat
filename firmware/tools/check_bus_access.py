@@ -1,13 +1,46 @@
 #!/usr/bin/env python3
-"""Bus-access lint (rules R1-R8, task 001, architecture section 3).
+"""Bus-access lint (rules R1-R8, tasks 001 and 013, architecture section 3).
 
-Scans *.c *.h *.cpp *.cc *.cxx *.hpp *.hh *.S under main/ and components/ (paths
-relative to firmware/). Comments and strings are not exempt. Backslash-newline
-continuations are spliced before matching. Output: path:line: R<n>: message, exit 1.
+Scans *.c *.h *.cpp *.cc *.cxx *.hpp *.hh *.S and files named exactly idf_component.yml
+(only R3 applies to those) under main/ and components/ (paths relative to firmware/).
+Comments and strings are not exempt. Backslash-newline continuations are spliced before
+matching (not in manifests). Output: path:line: R<n>: message, exit 1.
 
-Out of scope: `#include MACRO`, `##` token pasting, positional struct initializers
-and aliases for R8. R8 is a heuristic; the real guard is that the FC06 constant
-lives only in WRITE_FILE, plus the ELF check in task 002.
+  R1  no esp-modbus master/controller API (mbc_*, mbm_*) anywhere
+  R2  no esp-modbus slave/TCP API, no esp_modbus_slave.h
+  R3  no esp-modbus header (esp_modbus_*.h, mbcontroller.h) and no esp-modbus in a manifest
+  R4  UART TX/RTS/DTR/loopback/invert calls banned; only the exact uart_write_bytes in
+      components/rs485_port/src/. uart_ll_*, uart_hal_*, esp_rom_uart_tx_one_char,
+      uart_tx_one_char, raw UART0./UART1./UART2. register access and the uart_struct.h,
+      uart_ll.h, uart_hal.h includes are banned everywhere (also in rs485_port/src)
+  R5  UART setup (driver install/config/pin/mode/baud/parity/flow control/ISR/flush ...) only
+      in components/rs485_port/, uart_set_mode only with allowed modes
+  R6  CONFIG_DMT_BUS_TX/DE_GPIO only in components/rs485_port/ and main/
+  R7  mb_link_write* only in mb_link_write.c/.h
+  R8  function-code bytes only in mb_rtu and only 0x03 (read holding registers)
+
+Documented limits (not detected): `#include MACRO`, `##` token pasting, decimal, octal and
+binary function-code literals, function codes computed at run time or passed through
+variables, aliases/pointers to an FC field, array elements. R8 is a heuristic; the real guard
+is that FC bytes exist only in mb_rtu plus the ELF symbol check (task 013,
+tools/check_elf_symbols.py). Further limits:
+  - R8 (d) ++/-- and assignment: casts or dereference in the operand (`++(*p).fc`,
+    `++((T *)p)->fc`) are not detected.
+  - Arithmetic or bit operations on the FC constants inside components/mb_rtu/src/
+    (`MB_RTU_FC_READ_HOLDING + 3`, `MB_RTU_FC_READ_HOLDING | 0x80`) are not detected;
+    mb_rtu/src is the trusted place (review and the host tests cover it).
+  - Character and string escapes (`'\\x06'`, `'\\006'`, `"\\x06"`) are not detected as FC literals.
+  - CMakeLists.txt, *.cmake and Kconfig* files are not scanned (e.g. `-DFC=0x06`).
+  - "Exactly one uart_write_bytes call site" cannot be counted here (014 inspection item 3e).
+  - Raw UART register access is detected only as UART0./UART1./UART2.; `&UART1`,
+    `UART_LL_GET_HW(1)` or a `uart_dev_t *` are not, and the uart_struct.h/uart_ll.h/uart_hal.h
+    include ban does not see transitive includes.
+  - Trigraph `??=include` is not detected (GCC ignores trigraphs in GNU modes, inferred).
+  - Known false positives (comments and strings are not exempt): a line comment ending in
+    `--`/`++` directly before a line starting with an FC name (`// ----` then `fc = ...`) and
+    prose such as `... UART1.` in a comment report R8 resp. R4; reword the comment.
+Regex hygiene: every gap/comment pattern is built from _CMT, which can only end at the first
+`*/`; alternatives inside a repeated group never match the same text, so matching is linear.
 
   check_bus_access.py              scan the tree
   check_bus_access.py --self-test  run the built-in virtual-path cases
@@ -16,47 +49,96 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 SCAN_ROOTS = ("main", "components")
 SCAN_SUFFIXES = (".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".S")
+MANIFEST_NAME = "idf_component.yml"
 SKIP_DIRS = ("managed_components", "test_host")
 RE_BUILD_DIR = re.compile(r"build(?:[-_].*)?")
 
 WRITE_FILE = "components/mb_link/src/mb_link_write.c"
 WRITE_HEADER = "components/mb_link/include/mb_link_write.h"
-MB_LINK_SRC = "components/mb_link/src/"
 RS485_PORT = "components/rs485_port/"
+RS485_PORT_SRC = "components/rs485_port/src/"
+MB_RTU_SRC = "components/mb_rtu/src/"
+# R8 (c)/(d): the components where function-code bytes must not appear.
+FC_COMPONENTS = ("components/mb_rtu/", "components/mb_link/", RS485_PORT)
+# R8 (d): simple assignment to a function-code field is banned only here (mb_rtu parses frames).
+FC_SIMPLE_ASSIGN_COMPONENTS = ("components/mb_link/", RS485_PORT)
 
-R1_ALLOWED_CALLS = {
-    "mbc_master_create_serial",
-    "mbc_master_start",
-    "mbc_master_stop",
-    "mbc_master_delete",
-    "mbc_master_send_request",
-}
 UART_MODE_ALLOWED_ARGS = ("UART_MODE_RS485_HALF_DUPLEX", "UART_MODE_UART")
-READ_COMMANDS = ("0x03", "MB_FUNC_READ_HOLDING_REGISTER")
+UART_WRITE_ALLOWED = "uart_write_bytes"
+# The only MB_RTU_FC_* names, with the literal their #define must have (Modbus FC03 / exception 0x83).
+FC_DEFINE_LITERALS = {
+    "MB_RTU_FC_READ_HOLDING": "0x03",
+    "MB_RTU_FC_READ_HOLDING_EXC": "0x83",
+}
+READ_FC_VALUES = (0x03, 0x83)
+WRITE_FC_VALUES = (0x05, 0x06, 0x0F, 0x10, 0x15, 0x16, 0x17)
 
-RE_MASTER = re.compile(r"\bmbc_master_\w*")
+RE_MASTER = re.compile(r"\bmbc_(?!slave_|tcp_)\w*|\bmbm_\w*")
 RE_SLAVE = re.compile(r"\b(?:mbc_slave_\w*|mbs_\w*|mbc_tcp_\w*)")
-RE_INCLUDE = re.compile(r"#\s*include\s*[<\"]([^>\"]*)[>\"]")
+# One block comment; it can only end at its first "*/" and its alternatives never overlap, so no
+# input can be split into comments in more than one way (no exponential backtracking).
+_CMT = r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/"
+# Blanks and block comments between the tokens of a directive (a comment may contain newlines).
+_DIR_GAP = rf"(?:[ \t]|{_CMT})*"
+# Include directive: '#' or the digraph '%:', include/include_next/import (A1); group 1 = header.
+RE_INCLUDE = re.compile(
+    rf"(?:#|%:){_DIR_GAP}(?:include(?:_next)?|import){_DIR_GAP}[<\"]([^>\"]*)[>\"]")
+RE_MANIFEST_MODBUS = re.compile(r"esp[-_]modbus", re.IGNORECASE)
 RE_UART_TX = re.compile(
     r"\b(?:uart_write_bytes\w*|uart_tx_chars|uart_set_rts|uart_set_dtr"
-    r"|uart_set_loop_back|uart_set_line_inverse|_uart_set_pin\w*)\b")
+    r"|uart_set_loop_back|uart_set_line_inverse|_uart_set_pin\w*"
+    r"|uart_ll_\w*|uart_hal_\w*|esp_rom_uart_tx_one_char|uart_tx_one_char)\b")
+RE_UART_REGISTER = re.compile(rf"\bUART[0-2](?:\s|{_CMT})*\.")
+UART_LOW_LEVEL_HEADERS = ("uart_struct.h", "uart_ll.h", "uart_hal.h")
 RE_UART_SETUP = re.compile(
     r"\b(?:uart_set_pin|uart_set_mode|uart_driver_install|uart_driver_delete"
-    r"|uart_param_config|uart_read_bytes)\b")
+    r"|uart_param_config|uart_read_bytes|uart_set_hw_flow_ctrl|uart_set_baudrate"
+    r"|uart_set_parity|uart_set_word_length|uart_set_stop_bits|uart_set_tx_idle_num"
+    r"|uart_enable_tx_intr|uart_flush|uart_intr_config|uart_isr_register)\b")
 RE_UART_SET_MODE = re.compile(r"\buart_set_mode\s*\(")
 RE_GPIO_CFG = re.compile(r"CONFIG_DMT_BUS_(?:TX|DE)_GPIO")
 RE_LINK_WRITE = re.compile(r"\bmb_link_write\w*")
-RE_FUNC_WRITE = re.compile(r"\bMB_FUNC_WRITE\w*")
-RE_COMMAND_ASSIGN = re.compile(r"\bcommand\s*([-+*/%&|^]|<<|>>)?=(?!=)([^;,}]*)")
+RE_MB_FUNC = re.compile(r"\bMB_FUNC_\w*")
+RE_RTU_FC_NAME = re.compile(r"\bMB_RTU_FC_\w*")
+# #define of an MB_RTU_FC_* name; group 2 is the value when it is a lone hex literal (optional
+# u/U suffix) followed only by blanks/comments up to the end of the line, else None.
+# Accepts only '#' (not '%:'): a '%:define' is no accepted define, so its literal fails R8 (c).
+_GAP = rf"(?:[ \t]|{_CMT})"
+RE_FC_DEFINE = re.compile(
+    rf"#{_GAP}*define{_GAP}+(MB_RTU_FC_\w+)"
+    rf"(?:{_GAP}*(0[xX][0-9a-fA-F]+[uU]?)(?={_GAP}*(?:\n|\Z|//)))?")
+# Hex literal incl. C++14 digit separators; any trailing identifier chars are suffix (u, l, UDL).
+RE_HEX_LITERAL = re.compile(r"\b0[xX]([0-9a-fA-F](?:'?[0-9a-fA-F])*)\w*")
+# Blanks and comments (a block comment between name and operator must not hide the assignment).
+_FC_GAP = rf"(?:\s|{_CMT}|//[^\n]*\n)*"
+_FC_NAME = r"(?:fc|func|func_code|function_code|command)"
+_FC_FIELD = rf"(?<!\w){_FC_NAME}(?:{_FC_GAP}\))*{_FC_GAP}"
+RE_FC_COMPOUND_ASSIGN = re.compile(rf"{_FC_FIELD}(<<|>>|[-+*/%&|^])=", re.IGNORECASE)
+RE_FC_SIMPLE_ASSIGN = re.compile(rf"{_FC_FIELD}=(?!=)", re.IGNORECASE)
+RE_FC_POSTFIX_STEP = re.compile(rf"{_FC_FIELD}(\+\+|--)", re.IGNORECASE)
+# Prefix form: operator, optional '(', member path (a.b, p->q, a[i].c), then the name.
+RE_FC_PREFIX_STEP = re.compile(
+    rf"(\+\+|--){_FC_GAP}(?:\({_FC_GAP})*"
+    rf"(?:\w+{_FC_GAP}(?:\[[^\]]*\]{_FC_GAP})*(?:\.|->){_FC_GAP})*(?<!\w){_FC_NAME}(?!\w)",
+    re.IGNORECASE)
 # GCC also accepts trailing blanks after the backslash (with a warning) and CRLF.
 RE_CONTINUATION = re.compile(r"\\[ \t]*\r?\n")
 
 
 def _line_of(text, offset):
     return text.count("\n", 0, offset) + 1
+
+
+def _is_manifest(path):
+    return os.path.basename(path) == MANIFEST_NAME
+
+
+def _include_basename(include_target):
+    return re.split(r"[/\\]", include_target.strip())[-1]
 
 
 def _second_argument(text, open_paren_end):
@@ -80,31 +162,44 @@ def _second_argument(text, open_paren_end):
 
 def _check_r1(path, text):
     for m in RE_MASTER.finditer(text):
-        if not path.startswith(MB_LINK_SRC):
-            yield m.start(), "R1", f"{m.group()} only allowed in {MB_LINK_SRC}"
-        elif m.group() not in R1_ALLOWED_CALLS:
-            yield m.start(), "R1", f"{m.group()} is not an allowed esp-modbus master call"
+        yield m.start(), "R1", f"{m.group()} (esp-modbus master API) is banned"
 
 
 def _check_r2(path, text):
     for m in RE_SLAVE.finditer(text):
         yield m.start(), "R2", f"{m.group()} (esp-modbus slave/TCP) is banned"
     for m in RE_INCLUDE.finditer(text):
-        if os.path.basename(m.group(1)) == "esp_modbus_slave.h":
+        if _include_basename(m.group(1)) == "esp_modbus_slave.h":
             yield m.start(), "R2", "esp_modbus_slave.h include is banned"
 
 
+def _is_modbus_header(basename):
+    if basename == "esp_modbus_slave.h":
+        return False  # reported by R2
+    return basename.startswith("esp_modbus_") or basename == "mbcontroller.h"
+
+
 def _check_r3(path, text):
-    if path.startswith(MB_LINK_SRC):
+    if _is_manifest(path):
+        for m in RE_MANIFEST_MODBUS.finditer(text):
+            yield m.start(), "R3", "esp-modbus in a component manifest is banned"
         return
     for m in RE_INCLUDE.finditer(text):
-        if os.path.basename(m.group(1)) in ("esp_modbus_master.h", "esp_modbus_common.h"):
-            yield m.start(), "R3", f"{m.group(1)} include only allowed in {MB_LINK_SRC}"
+        if _is_modbus_header(_include_basename(m.group(1))):
+            yield m.start(), "R3", f"{m.group(1)} (esp-modbus header) include is banned"
 
 
 def _check_r4(path, text):
+    in_port_src = path.startswith(RS485_PORT_SRC)
     for m in RE_UART_TX.finditer(text):
-        yield m.start(), "R4", f"{m.group()} is banned (UART TX/RTS/DTR/loopback/invert)"
+        if in_port_src and m.group() == UART_WRITE_ALLOWED:
+            continue
+        yield m.start(), "R4", f"{m.group()} is banned (UART TX/RTS/DTR/loopback/invert/low-level)"
+    for m in RE_UART_REGISTER.finditer(text):
+        yield m.start(), "R4", "raw UART register access is banned"
+    for m in RE_INCLUDE.finditer(text):
+        if _include_basename(m.group(1)) in UART_LOW_LEVEL_HEADERS:
+            yield m.start(), "R4", f"{m.group(1)} (low-level UART header) include is banned"
 
 
 def _check_r5(path, text):
@@ -131,23 +226,74 @@ def _check_r7(path, text):
         yield m.start(), "R7", f"{m.group()} only allowed in {WRITE_FILE} and {WRITE_HEADER}"
 
 
+def _check_r8_names(path, text):
+    """R8 (a) and (b): esp-modbus FC constants and the MB_RTU_FC_* names."""
+    for m in RE_MB_FUNC.finditer(text):
+        yield m.start(), "R8", f"{m.group()} (esp-modbus function code) is banned"
+    for m in RE_RTU_FC_NAME.finditer(text):
+        if not path.startswith(MB_RTU_SRC):
+            yield m.start(), "R8", f"{m.group()} only allowed in {MB_RTU_SRC}"
+        elif m.group() not in FC_DEFINE_LITERALS:
+            yield m.start(), "R8", f"{m.group()} is not an allowed function-code name"
+
+
+def _check_r8_defines(path, text):
+    """R8 (b): each define of an allowed name must carry its literal.
+
+    Returns (violations, offsets of the accepted value literals); the offsets are the only
+    0x03/0x83 literals R8 (c) lets through.
+    """
+    violations, accepted = [], set()
+    if not path.startswith(MB_RTU_SRC):
+        return violations, accepted
+    for m in RE_FC_DEFINE.finditer(text):
+        name, value = m.group(1), m.group(2)
+        if name not in FC_DEFINE_LITERALS:
+            continue  # reported by the name check
+        expected = FC_DEFINE_LITERALS[name]
+        if value is None or value.lower().rstrip("u") != expected:
+            violations.append((m.start(), "R8", f"{name} must be defined as literal {expected}"))
+        else:
+            accepted.add(m.start(2))
+    return violations, accepted
+
+
+def _check_r8_literals(text, accepted_offsets):
+    """R8 (c): hex literals with a function-code value."""
+    for m in RE_HEX_LITERAL.finditer(text):
+        if m.start() in accepted_offsets:
+            continue
+        value = int(m.group(1).replace("'", ""), 16)
+        if value in READ_FC_VALUES or value in WRITE_FC_VALUES:
+            yield m.start(), "R8", f"function-code literal {m.group()} only allowed as the MB_RTU_FC_READ_HOLDING[_EXC] define in {MB_RTU_SRC}"
+
+
+def _check_r8_assignments(path, text):
+    """R8 (d): ++/--, compound (and, outside mb_rtu, simple) assignment to a function-code field."""
+    for m in RE_FC_COMPOUND_ASSIGN.finditer(text):
+        yield m.start(), "R8", f"compound assignment '{m.group(1)}=' to a function-code field is banned"
+    for regex in (RE_FC_POSTFIX_STEP, RE_FC_PREFIX_STEP):
+        for m in regex.finditer(text):
+            yield m.start(), "R8", f"'{m.group(1)}' on a function-code field is banned"
+    if not path.startswith(FC_SIMPLE_ASSIGN_COMPONENTS):
+        return
+    for m in RE_FC_SIMPLE_ASSIGN.finditer(text):
+        yield m.start(), "R8", "assignment to a function-code field is banned here"
+
+
 def _check_r8(path, text):
-    if not path.startswith("components/") or path == WRITE_FILE:
+    yield from _check_r8_names(path, text)
+    define_violations, accepted = _check_r8_defines(path, text)
+    yield from define_violations
+    if not path.startswith(FC_COMPONENTS):
         return
-    for m in RE_FUNC_WRITE.finditer(text):
-        yield m.start(), "R8", f"{m.group()} only allowed in {WRITE_FILE}"
-    if not path.startswith("components/mb_link/"):
-        return
-    for m in RE_COMMAND_ASSIGN.finditer(text):
-        operator, value = m.group(1), m.group(2).strip()
-        if operator:
-            yield m.start(), "R8", f"compound assignment '{operator}=' to command is banned"
-        elif value not in READ_COMMANDS:
-            yield m.start(), "R8", f"command must be one of {READ_COMMANDS}, got '{value}'"
+    yield from _check_r8_literals(text, accepted)
+    yield from _check_r8_assignments(path, text)
 
 
 CHECKS = (_check_r1, _check_r2, _check_r3, _check_r4,
           _check_r5, _check_r6, _check_r7, _check_r8)
+MANIFEST_CHECKS = (_check_r3,)
 
 
 def _splice_continuations(text):
@@ -164,13 +310,21 @@ def _splice_continuations(text):
 
 def check_source(path, text):
     """Return sorted (line, rule, message) violations for one file."""
-    spliced, removed_at = _splice_continuations(text)
+    if _is_manifest(path):
+        spliced, removed_at, checks = text, [], MANIFEST_CHECKS
+    else:
+        spliced, removed_at = _splice_continuations(text)
+        checks = CHECKS
     found = set()
-    for check in CHECKS:
+    for check in checks:
         for offset, rule, message in check(path, spliced):
             hidden = sum(1 for pos in removed_at if pos <= offset)
             found.add((_line_of(spliced, offset) + hidden, rule, message))
     return sorted(found)
+
+
+def _is_scanned_name(name):
+    return name.endswith(SCAN_SUFFIXES) or name == MANIFEST_NAME
 
 
 def _iter_sources(root):
@@ -179,7 +333,7 @@ def _iter_sources(root):
             dirnames[:] = sorted(d for d in dirnames
                                  if d not in SKIP_DIRS and not RE_BUILD_DIR.fullmatch(d))
             for name in sorted(filenames):
-                if name.endswith(SCAN_SUFFIXES):
+                if _is_scanned_name(name):
                     yield os.path.join(dirpath, name)
 
 
@@ -193,81 +347,283 @@ def scan_tree(root):
     return violations
 
 
+MB_LINK_C = "components/mb_link/src/mb_link.c"
+MB_RTU_C = "components/mb_rtu/src/mb_rtu.c"
+RS485_C = "components/rs485_port/src/rs485_port.c"
+RD_C = "components/daikin_regs/src/daikin_regs.c"
+MB_LINK_YML = "components/mb_link/idf_component.yml"
+MAIN_C = "main/main.c"
+COMPOUND_OPERATORS = ("|=", "&=", "^=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=")
+WRITE_FC_SNIPPETS = ("0x05", "0x06", "0x0F", "0x10", "0x15", "0x16", "0x17")
+FC_STEP_COMPONENT_FILES = (MB_RTU_C, MB_LINK_C, RS485_C)
+FC_STEP_BAD_SNIPPETS = ("fc++;", "fc--;", "++fc;", "--fc;", "r.command ++;", "++ r.command;",
+                        "--p->func_code;", "(fc)++;", "++(fc);", "fc /* c */ ++;",
+                        "++ /* c */ fc;", "++a[i].fc;", "FUNC++;")
+NEW_R5_CALLS = ("uart_set_hw_flow_ctrl(p, UART_HW_FLOWCTRL_DISABLE, 0);", "uart_set_baudrate(p, 9600);",
+                "uart_set_parity(p, UART_PARITY_DISABLE);", "uart_set_word_length(p, UART_DATA_8_BITS);",
+                "uart_set_stop_bits(p, UART_STOP_BITS_1);", "uart_set_tx_idle_num(p, 0);",
+                "uart_enable_tx_intr(p, 1, 0);", "uart_flush(p);", "uart_intr_config(p, &c);",
+                "uart_isr_register(p, f, a, 0, &h);")
+# Task 014 plans these calls in rs485_port/src: the new rules must let them through.
+PORT_OPEN_AND_TRANSACT = (
+    "uart_config_t cfg = { .baud_rate = 9600, .data_bits = UART_DATA_8_BITS, "
+    ".parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1, "
+    ".flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT }; "
+    "gpio_set_level(de, 0); gpio_set_direction(de, GPIO_MODE_OUTPUT); "
+    "uart_param_config(p, &cfg); uart_driver_install(p, 256, 0, 0, NULL, 0); "
+    "uart_set_mode(p, UART_MODE_RS485_HALF_DUPLEX); uart_set_pin(p, tx, rx, de, UART_PIN_NO_CHANGE); "
+    "uart_set_rx_full_threshold(p, 1); gpio_pullup_en(rx); uart_get_buffered_data_len(p, &n); "
+    "uart_flush_input(p); n = uart_write_bytes(p, tx, 8); uart_wait_tx_done(p, t); "
+    "uart_read_bytes(p, b, 1, t); int64_t now = esp_timer_get_time(); uart_driver_delete(p);")
+PORT_SILENCE_CHECK = (
+    "uart_driver_install(p, 256, 0, 8, &q, 0); uart_set_mode(p, UART_MODE_UART); "
+    "uart_set_pin(p, UART_PIN_NO_CHANGE, rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); "
+    "if (xQueueReceive(q, &ev, t) && (ev.type == UART_DATA || ev.type == UART_FRAME_ERR "
+    "|| ev.type == UART_PARITY_ERR || ev.type == UART_BREAK || ev.type == UART_FIFO_OVF "
+    "|| ev.type == UART_BUFFER_FULL)) { gap_bytes += ev.size; faults++; } uart_driver_delete(p);")
+# Repetition-heavy inputs for the timing guard (each case must finish within CASE_TIME_LIMIT_S).
+REPEAT = 5000
+CASE_TIME_LIMIT_S = 1.0
+
 # (virtual path, snippet, expected set of rules); empty set = must pass.
 SELF_TEST_CASES = (
-    # R1
-    ("components/mb_link/src/mb_link.c", "mbc_master_send_request(h, &r, d);", set()),
-    ("components/mb_link/src/mb_link.c", "mbc_master_create_serial(&c, &h);", set()),
-    ("components/mb_link/src/mb_link.c", "mbc_master_start(h); mbc_master_stop(h); mbc_master_delete(h);", set()),
-    ("components/mb_link/src/mb_link.c", "mbc_master_set_parameter(h, 1, 2, 3);", {"R1"}),
+    # R1: no esp-modbus master API anywhere
+    (MB_LINK_C, "mbc_master_send_request(h, &r, d);", {"R1"}),
+    (MB_LINK_C, "mbc_master_set_descriptor(h, d, 1);", {"R1"}),
+    (MB_LINK_C, "mbc_master_create_serial(&c, &h);", {"R1"}),
+    (MB_LINK_C, "mbc_master_start(h); mbc_master_stop(h); mbc_master_delete(h);", {"R1"}),
+    (MB_LINK_C, "mbc_master_set_parameter(h, 1, 2, 3);", {"R1"}),
     ("components/mb_link/include/mb_link.h", "mbc_master_start(h);", {"R1"}),
-    ("main/main.c", "mbc_master_start(h);", {"R1"}),
+    (MAIN_C, "mbc_master_start(h);", {"R1"}),
+    (MAIN_C, "mbm_rq_read_holding_reg(i, 1, 0, 1, 0);", {"R1"}),
+    (MAIN_C, "mbc_dummy();", {"R1"}),
+    (MAIN_C, "mb_link_read(1, 0, 1, v, &e);", set()),
+    (MAIN_C, "mb_rtu_build_fc03(1, 0, 1, b);", set()),
     # R2
-    ("components/mb_link/src/mb_link.c", "mbc_slave_start(h);", {"R2"}),
-    ("main/main.c", "mbs_init();", {"R2"}),
-    ("main/main.c", "mbc_tcp_master_x();", {"R2"}),
-    ("components/mb_link/src/mb_link.c", '#include "esp_modbus_slave.h"', {"R2"}),
-    # R3
-    ("components/mb_link/src/mb_link.c", '#include "esp_modbus_master.h"', set()),
-    ("components/mb_link/src/mb_link.c", "#include <esp_modbus_common.h>", set()),
+    (MB_LINK_C, "mbc_slave_start(h);", {"R2"}),
+    (MAIN_C, "mbs_init();", {"R2"}),
+    (MAIN_C, "mbc_tcp_master_x();", {"R2"}),
+    (MB_LINK_C, '#include "esp_modbus_slave.h"', {"R2"}),
+    (MB_LINK_C, '#include "some/dir/esp_modbus_slave.h"', {"R2"}),
+    # R3: no esp-modbus header anywhere, no esp-modbus in manifests
+    (MB_LINK_C, '#include "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, "#include <esp_modbus_common.h>", {"R3"}),
+    (MB_LINK_C, '#include "mbcontroller.h"', {"R3"}),
+    (MB_LINK_C, '#  include "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, '#include_next <esp_modbus_master.h>', {"R3"}),
+    (MB_LINK_C, '#include "esp_modbus/esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, '#include "esp_modbus_future.h"', {"R3"}),
     ("components/mb_link/include/mb_link.h", '#include "esp_modbus_master.h"', {"R3"}),
-    ("main/main.c", "#include \"esp_modbus_common.h\"", {"R3"}),
-    # R4
-    ("main/main.c", 'uart_write_bytes(1, "x", 1);', {"R4"}),
-    ("components/rs485_port/src/rs485_port.c", "uart_tx_chars(1, b, 1);", {"R4"}),
-    ("components/mb_link/src/mb_link.c", "uart_set_rts(1, 0);", {"R4"}),
-    ("main/main.c", "uart_set_dtr(1, 0);", {"R4"}),
-    ("main/main.c", "uart_set_loop_back(1, true);", {"R4"}),
-    ("main/main.c", "uart_set_line_inverse(1, 0);", {"R4"}),
-    ("components/rs485_port/src/rs485_port.c", "_uart_set_pin6(1);", {"R4"}),
-    ("main/main.c", "uart_write_bytes_with_break(1, b, 1, 2);", {"R4"}),
+    (MAIN_C, '#include "esp_modbus_common.h"', {"R3"}),
+    (MAIN_C, '#include "mb_link.h"', set()),
+    ("components/mb_link/idf_component.yml", '  espressif/esp-modbus:\n    version: "==2.1.4"', {"R3"}),
+    ("components/mb_link/idf_component.yml", '# uses esp-modbus', {"R3"}),
+    ("main/idf_component.yml", "  espressif/esp-modbus: '*'", {"R3"}),
+    ("components/mb_link/idf_component.yml", 'dependencies:\n  idf: ">=6.0"', set()),
+    # R4: only the exact uart_write_bytes in rs485_port/src
+    (RS485_C, "uart_write_bytes(p, b, 8);", set()),
+    ("components/rs485_port/include/rs485_port.h", "uart_write_bytes(p, b, 8);", {"R4"}),
+    (MB_LINK_C, "uart_write_bytes(p, b, 8);", {"R4"}),
+    (MB_RTU_C, "uart_write_bytes(p, b, 8);", {"R4"}),
+    (RS485_C, "uart_write_bytes_with_break(p, b, 8, 2);", {"R4"}),
+    (RS485_C, "uart_tx_chars(p, b, 1);", {"R4"}),
+    (RS485_C, "uart_\\\nwrite_bytes(p, b, 8); uart_write_bytes_with_break(p, b, 8, 2);", {"R4"}),
+    ("components/rs485_port/src/sub/x.c", "uart_write_bytes(p, b, 8);", set()),
+    (MAIN_C, 'uart_write_bytes(1, "x", 1);', {"R4"}),
+    (MB_LINK_C, "uart_set_rts(1, 0);", {"R4"}),
+    (MAIN_C, "uart_set_dtr(1, 0);", {"R4"}),
+    (MAIN_C, "uart_set_loop_back(1, true);", {"R4"}),
+    (MAIN_C, "uart_set_line_inverse(1, 0);", {"R4"}),
+    (RS485_C, "_uart_set_pin6(1);", {"R4"}),
+    (MAIN_C, "uart_write_bytes_with_break(1, b, 1, 2);", {"R4"}),
     # R5
-    ("components/rs485_port/src/rs485_port.c", "uart_set_mode(p, UART_MODE_RS485_HALF_DUPLEX);", set()),
-    ("components/rs485_port/src/rs485_port.c", "uart_set_mode(p,\n    UART_MODE_UART);", set()),
-    ("components/rs485_port/src/rs485_port.c", "uart_driver_install(p, 256, 0, 0, NULL, 0); uart_read_bytes(p, b, 1, 1);", set()),
-    ("components/rs485_port/src/rs485_port.c", "uart_set_mode(p, UART_MODE_RS485_APP_CTRL);", {"R5"}),
-    ("components/rs485_port/src/rs485_port.c", "uart_set_mode(p, mode_var);", {"R5"}),
-    ("components/mb_link/src/mb_link.c", "uart_set_mode(p, UART_MODE_UART);", {"R5"}),
-    ("main/main.c", "uart_driver_install(1, 256, 0, 0, NULL, 0);", {"R5"}),
-    ("main/main.c", "uart_set_pin(1, 5, 4, 6, -1);", {"R5"}),
-    ("components/mb_link/src/mb_link.c", "uart_param_config(1, &cfg);", {"R5"}),
-    ("main/main.c", "uart_read_bytes(1, b, 1, 1);", {"R5"}),
-    ("main/main.c", "uart_driver_delete(1);", {"R5"}),
+    (RS485_C, "uart_set_mode(p, UART_MODE_RS485_HALF_DUPLEX);", set()),
+    (RS485_C, "uart_set_mode(p,\n    UART_MODE_UART);", set()),
+    (RS485_C, "uart_driver_install(p, 256, 0, 0, NULL, 0); uart_read_bytes(p, b, 1, 1);", set()),
+    (RS485_C, "uart_set_mode(p, UART_MODE_RS485_APP_CTRL);", {"R5"}),
+    (RS485_C, "uart_set_mode(p, mode_var);", {"R5"}),
+    (MB_LINK_C, "uart_set_mode(p, UART_MODE_UART);", {"R5"}),
+    (MAIN_C, "uart_driver_install(1, 256, 0, 0, NULL, 0);", {"R5"}),
+    (MAIN_C, "uart_set_pin(1, 5, 4, 6, -1);", {"R5"}),
+    (MB_LINK_C, "uart_param_config(1, &cfg);", {"R5"}),
+    (MAIN_C, "uart_read_bytes(1, b, 1, 1);", {"R5"}),
+    (MAIN_C, "uart_driver_delete(1);", {"R5"}),
     # R6
-    ("main/main.c", "int g = CONFIG_DMT_BUS_TX_GPIO;", set()),
-    ("components/rs485_port/src/rs485_port.c", "int g = CONFIG_DMT_BUS_DE_GPIO;", set()),
-    ("components/mb_link/src/mb_link.c", "int g = CONFIG_DMT_BUS_DE_GPIO;", {"R6"}),
+    (MAIN_C, "int g = CONFIG_DMT_BUS_TX_GPIO;", set()),
+    (RS485_C, "int g = CONFIG_DMT_BUS_DE_GPIO;", set()),
+    (MB_LINK_C, "int g = CONFIG_DMT_BUS_DE_GPIO;", {"R6"}),
     ("components/bus_task/src/x.c", "int g = CONFIG_DMT_BUS_TX_GPIO;", {"R6"}),
     ("components/bus_task/src/x.c", "int g = CONFIG_DMT_BUS_RX_GPIO;", set()),
     # R7
     ("components/mb_link/src/mb_link_write.c", "int mb_link_write(int a);", set()),
     ("components/mb_link/include/mb_link_write.h", "int mb_link_write(int a);", set()),
-    ("components/mb_link/src/mb_link.c", "mb_link_write(1, 2, 3);", {"R7"}),
-    ("main/main.c", "mb_link_write_reg(1);", {"R7"}),
-    # R8
-    ("components/mb_link/src/mb_link_write.c", "r.command = 0x06; x = MB_FUNC_WRITE_SINGLE_REGISTER;", set()),
-    ("components/mb_link/src/mb_link.c", "r.command = 0x03;", set()),
-    ("components/mb_link/src/mb_link.c", "{ .command = MB_FUNC_READ_HOLDING_REGISTER, .x = 1 }", set()),
-    ("components/mb_link/src/mb_link.c", "if (r.command == 0x06) {}", set()),
-    ("components/mb_link/src/mb_link.c", "r.command = 0x06;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "command = fc;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "r.command =\n    0x10;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "x = MB_FUNC_WRITE_SINGLE_REGISTER;", {"R8"}),
-    ("components/rs485_port/src/rs485_port.c", "x = MB_FUNC_WRITE_MULTIPLE_REGISTERS;", {"R8"}),
-    ("main/main.c", "x = MB_FUNC_WRITE_SINGLE_REGISTER;", set()),
-    ("components/mb_link/src/mb_link.c", "r.command |= 0x04;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "r.command <<= 1;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "r.command |= 0x03;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "r.command &= 0x03;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "r.command += 0x03;", {"R8"}),
-    ("components/mb_link/src/mb_link.c", "if (r.command >= 0x06 || r.command != 0x06) {}", set()),
+    (MB_LINK_C, "mb_link_write(1, 2, 3);", {"R7"}),
+    (MAIN_C, "mb_link_write_reg(1);", {"R7"}),
+    # R8 (a): esp-modbus constants anywhere
+    (MB_LINK_C, "x = MB_FUNC_READ_HOLDING_REGISTER;", {"R8"}),
+    (MAIN_C, "x = MB_FUNC_WRITE_SINGLE_REGISTER;", {"R8"}),
+    (MB_LINK_C, "x = MB_FUNC_WRITE_SINGLE_REGISTER;", {"R8"}),
+    (RS485_C, "x = MB_FUNC_WRITE_MULTIPLE_REGISTERS;", {"R8"}),
+    ("components/mb_link/src/mb_link_write.c", "r.command = 0x06; x = MB_FUNC_WRITE_SINGLE_REGISTER;", {"R8"}),
+    # R8 (b): MB_RTU_FC_* names and their defines
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03u\n#define MB_RTU_FC_READ_HOLDING_EXC 0x83u", set()),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03", set()),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0X03U /* read */", set()),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING_EXC 0x83 // exception", set()),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03u\nf[1] = MB_RTU_FC_READ_HOLDING;", set()),
+    (MB_RTU_C, "if (rx[1] == MB_RTU_FC_READ_HOLDING_EXC) {}", set()),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x06u", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING_EXC 0x03u", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x83u", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 3", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING (0x03u)", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03u + 0", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING", {"R8"}),
+    (MB_RTU_C, "#define /* x */ MB_RTU_FC_READ_HOLDING 6", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x003u", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u", {"R8"}),
+    (MB_RTU_C, "x = MB_RTU_FC_OTHER;", {"R8"}),
+    ("components/mb_rtu/include/mb_rtu.h", "#define MB_RTU_FC_READ_HOLDING 0x03u", {"R8"}),
+    (MB_LINK_C, "out[1] = MB_RTU_FC_READ_HOLDING;", {"R8"}),
+    (MAIN_C, "x = MB_RTU_FC_READ_HOLDING;", {"R8"}),
+    # R8 (c): function-code hex literals in mb_rtu / mb_link / rs485_port
+    (MB_LINK_C, "b = 0x06;", {"R8"}),
+    (MB_LINK_C, "b = 0X0f;", {"R8"}),
+    (MB_LINK_C, "b = 0x0010u;", {"R8"}),
+    (MB_LINK_C, "b = 0x03;", {"R8"}),
+    (MB_LINK_C, "b = 0x83;", {"R8"}),
+    (MB_LINK_C, "b = 0x0'6;", {"R8"}),
+    (MB_LINK_C, "b = 0x06UL;", {"R8"}),
+    (MB_LINK_C, "b = 0x06_fc;", {"R8"}),
+    (MB_LINK_C, "b = (0x16);", {"R8"}),
+    (MB_LINK_C, "/* FC 0x06 */", {"R8"}),
+    (RS485_C, "n = 0x17;", {"R8"}),
+    (MB_LINK_C, "x = 0x0300;", set()),
+    (MB_LINK_C, "x = 0x04; y = 0x07; z = 0x1F; w = 0x84; v = 0x0A;", set()),
+    (MB_LINK_C, "x = a0x06;", set()),
+    ("components/daikin_regs/src/daikin_regs.c", "x = 0x06;", set()),
+    (MAIN_C, "x = 0x06;", set()),
+    (MB_RTU_C, "crc ^= 0xA001u; c = 0xFFFFu; m = 0x80u;", set()),
+    (MB_RTU_C, "if (rx[1] == 0x03) {}", {"R8"}),
+    (MB_RTU_C, "if (rx[1] == 0x83) {}", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03u\nif (rx[1] == 0x03u) {}", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_READ_HOLDING 0x03u\n#define MB_RTU_FC_READ_HOLDING_EXC 0x83u\nx = 0x83;", {"R8"}),
+    ("components/mb_rtu/include/mb_rtu.h", "enum { K = 0x03 };", {"R8"}),
+    # R8 (d): assignments to function-code fields
+    (MB_RTU_C, "uint8_t fc = rx[1];", set()),
+    (MB_RTU_C, "r.command = rx[1];", set()),
+    (MB_LINK_C, "fc = 3;", {"R8"}),
+    (MB_LINK_C, "r.command = 0x03;", {"R8"}),
+    (MB_LINK_C, "uint8_t fc = rx[1];", {"R8"}),
+    (MB_LINK_C, "{ .command = x, .y = 1 }", {"R8"}),
+    (MB_LINK_C, "command = other;", {"R8"}),
+    (MB_LINK_C, "r.command =\n    other;", {"R8"}),
+    (MB_LINK_C, "p->func = y;", {"R8"}),
+    (MB_LINK_C, "p->func_code = y;", {"R8"}),
+    (MB_LINK_C, "Function_Code = y;", {"R8"}),
+    (MB_LINK_C, "FC=y;", {"R8"}),
+    (MB_LINK_C, "(fc) = y;", {"R8"}),
+    (MB_LINK_C, "fc /* c */ = y;", {"R8"}),
+    (MB_LINK_C, "fc // c\n = y;", {"R8"}),
+    (MB_LINK_C, "r.command /* c */ |= y;", {"R8"}),
+    (MB_LINK_C, "(fc /* c */) = y;", {"R8"}),
+    (MB_LINK_C, "if (fc /* c */ == y) {}", set()),
+    (RS485_C, "fc = y;", {"R8"}),
+    (RS485_C, "r.func = y;", {"R8"}),
+    (MB_LINK_C, "if (fc == x || fc >= y || fc != z || fc <= w) {}", set()),
+    (MB_LINK_C, "if (r.command == a || r.command >= b || r.command != c || r.command <= d) {}", set()),
+    (MB_LINK_C, "if (g(fc) == 2) {} else if (h(fc)) y = 1;", set()),
+    (MB_LINK_C, "int fcx = 1; int xfc = 2; int fc_len = 3; int func_codes = 4; MB_RTU_FC = 5;", set()),
+    (MB_LINK_C, "int commands = 1; int my_command = 2;", set()),
+    ("components/daikin_regs/src/daikin_regs.c", "fc = 3; command |= 1;", set()),
+    (MAIN_C, "fc = 3; command |= 1;", set()),
+    ("components/mb_link/include/mb_link.h", "int fc;", set()),
     # comments, strings, continuations, multi-line calls
-    ("main/main.c", "// uart_write_bytes(1, b, 1);", {"R4"}),
-    ("main/main.c", 'puts("uart_write_bytes");', {"R4"}),
-    ("main/main.c", "uart_\\\nwrite_bytes(1, b, 1);", {"R4"}),
-    ("components/rs485_port/src/rs485_port.c", "uart_set_mode(p,\n    UART_MODE_RS485_APP_CTRL);", {"R5"}),
-    ("main/main.c", "uart_\\\r\nwrite_bytes(1);", {"R4"}),
-    ("main/main.c", "uart_\\ \t\nwrite_bytes(1);", {"R4"}),
+    (MAIN_C, "// uart_write_bytes(1, b, 1);", {"R4"}),
+    (MAIN_C, 'puts("uart_write_bytes");', {"R4"}),
+    (MAIN_C, "uart_\\\nwrite_bytes(1, b, 1);", {"R4"}),
+    (RS485_C, "uart_set_mode(p,\n    UART_MODE_RS485_APP_CTRL);", {"R5"}),
+    (MAIN_C, "uart_\\\r\nwrite_bytes(1);", {"R4"}),
+    (MAIN_C, "uart_\\ \t\nwrite_bytes(1);", {"R4"}),
+    (MB_LINK_C, "r.com\\\nmand = y;", {"R8"}),
+    (MB_LINK_C, "b = 0x0\\\n6;", {"R8"}),
+    # A1: include directive detection (comments, digraph, import, include_next)
+    (MB_LINK_C, '#include /*c*/ "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, "#/**/include <esp_modbus_master.h>", {"R3"}),
+    (MB_LINK_C, "# /* a */ include /* b */ <mbcontroller.h>", {"R3"}),
+    (MB_LINK_C, '#/* multi\nline */include "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, '%:include "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, "%: include <mbcontroller.h>", {"R3"}),
+    (MB_LINK_C, '#import "esp_modbus_master.h"', {"R3"}),
+    (MB_LINK_C, "#include_next /**/ <esp_modbus_common.h>", {"R3"}),
+    (MB_LINK_C, "#import <esp_modbus_slave.h>", {"R2"}),
+    (MB_LINK_C, '%:include "esp_modbus_slave.h"', {"R2"}),
+    (MAIN_C, '#include /*c*/ "mb_link.h"', set()),
+    (MB_RTU_C, "%:define MB_RTU_FC_READ_HOLDING 0x03u", {"R8"}),
+    # A2: timing guard, one name/directive per case with thousands of repeated comments
+    (MB_LINK_C, "fc" + " /* a */" * REPEAT + " ;", set()),
+    (MB_LINK_C, "fc" + " /* a */" * REPEAT + " = y;", {"R8"}),
+    (MB_RTU_C, "r.command" + " /* a */" * REPEAT + " |= 1;", {"R8"}),
+    (MB_LINK_C, "#" + "/**/" * REPEAT + "include <esp_modbus_master.h>", {"R3"}),
+    (MB_LINK_C, "#" + "/**/" * REPEAT + "x", set()),
+    (MB_RTU_C, "#define" + " /* x */" * REPEAT + " MB_RTU_FC_READ_HOLDING 0x03u", set()),
+    (MB_RTU_C, "fc" + " /* a */" * REPEAT + " ++;", {"R8"}),
+    (MB_LINK_C, "fc" + ")" * REPEAT + " ;", set()),
+    (MB_LINK_C, "++" + " /* a */" * REPEAT + " fc;", {"R8"}),
+    (MB_LINK_C, "++" + "(" * REPEAT + "fc;", {"R8"}),
+    (MB_LINK_C, "++" + "a." * REPEAT + "x;", set()),
+    (MB_LINK_C, "++" + "a[0]." * REPEAT + "fc;", {"R8"}),
+    (MB_LINK_C, "UART1" + " /* a */" * REPEAT + " .x = 0;", {"R4"}),
+    # A3: ++/-- that must pass
+    (MB_RTU_C, "i++; n--; ++i; fc_len++; ++fcx; --xfc; ++commands;", set()),
+    (MB_RTU_C, "x = fc + +y; z = fc - -1;", set()),
+    (MB_RTU_C, "if (fc == 3) {}", set()),
+    (MB_RTU_C, "a = b + ++i; c = d - --j;", set()),
+    (RD_C, "fc++; --command;", set()),
+    (MAIN_C, "fc++; --command;", set()),
+    # A4: manifest spellings
+    (MB_LINK_YML, '  espressif/esp_modbus: "*"', {"R3"}),
+    (MB_LINK_YML, '  ESPRESSIF/ESP-MODBUS: "*"', {"R3"}),
+    (MB_LINK_YML, "# Esp_Modbus", {"R3"}),
+    (MB_LINK_YML, '  espressif/modbus_other: "*"', set()),
+    # B / R4: low-level UART access banned everywhere, including rs485_port/src
+    (RS485_C, "uart_ll_write_txfifo(h, b, 8);", {"R4"}),
+    (MB_LINK_C, "uart_ll_write_txfifo(h, b, 8);", {"R4"}),
+    (MAIN_C, "uart_ll_write_txfifo(h, b, 8);", {"R4"}),
+    (RS485_C, "uart_hal_write_txfifo(&h, b, 8, &n);", {"R4"}),
+    (RS485_C, "esp_rom_uart_tx_one_char('x');", {"R4"}),
+    (MAIN_C, "esp_rom_uart_tx_one_char('x');", {"R4"}),
+    (MAIN_C, "uart_tx_one_char('x');", {"R4"}),
+    (RS485_C, "UART1.fifo.val = 0;", {"R4"}),
+    (MAIN_C, "UART0 . conf0.val = 0;", {"R4"}),
+    (RS485_C, '#include "soc/uart_struct.h"', {"R4"}),
+    (RS485_C, "#include <hal/uart_ll.h>", {"R4"}),
+    (MB_LINK_C, '#include "hal/uart_hal.h"', {"R4"}),
+    (MAIN_C, '#include /*c*/ "hal/uart_ll.h"', {"R4"}),
+    (RS485_C, '#include "uart_ll.h"', {"R4"}),
+    (MAIN_C, "int p = UART_NUM_1; int q = UART_PIN_NO_CHANGE; int r = UART10;", set()),
+    (RS485_C, '#include "driver/uart.h"', set()),
+    (RS485_C, '#include "hal/uart_types.h"', set()),
+    # B / R5: new setup names allowed only in rs485_port; uart_flush_input stays allowed
+    (RS485_C, "uart_flush_input(p);", set()),
+    (MAIN_C, "uart_flush_input(p);", set()),
+    # 014 compatibility: the planned rs485_port/src calls pass
+    (RS485_C, PORT_OPEN_AND_TRANSACT, set()),
+    (RS485_C, PORT_SILENCE_CHECK, set()),
+) + tuple(
+    (path, snippet, {"R8"})
+    for path in FC_STEP_COMPONENT_FILES for snippet in FC_STEP_BAD_SNIPPETS
+) + tuple(
+    (path, call, {"R5"}) for path in (MAIN_C, MB_LINK_C) for call in NEW_R5_CALLS
+) + tuple(
+    (RS485_C, call, set()) for call in NEW_R5_CALLS
+) + tuple(
+    (path, f"r.command {op} 1;", {"R8"})
+    for path in (MB_RTU_C, MB_LINK_C, RS485_C) for op in COMPOUND_OPERATORS
+) + tuple(
+    (MB_RTU_C, f"fc {op} 1;", {"R8"}) for op in COMPOUND_OPERATORS
+) + tuple(
+    (MB_LINK_C, f"b = {code};", {"R8"}) for code in WRITE_FC_SNIPPETS
 )
 
 # (snippet, expected line of the single violation): offsets must survive splices.
@@ -296,7 +652,17 @@ def _tree_test_expectations():
         ("components/c/a.hh", True),
         ("components/c/a.S", True),
         ("components/c/a.txt", False),
+        ("components/c/idf_component.yml", True),
+        ("main/idf_component.yml", True),
+        ("components/c/other.yml", False),
+        ("components/c/managed_components/idf_component.yml", False),
+        ("components/c/build/idf_component.yml", False),
     )
+
+
+def _walker_marker(rel):
+    """File content that is flagged (R3 in manifests, else R4) if the file is scanned."""
+    return "espressif/esp-modbus\n" if rel.endswith(".yml") else "uart_write_bytes(1, b, 1);\n"
 
 
 def _tree_walker_test():
@@ -307,7 +673,7 @@ def _tree_walker_test():
             full = os.path.join(root, rel)
             os.makedirs(os.path.dirname(full), exist_ok=True)
             with open(full, "w", encoding="utf-8") as f:
-                f.write("uart_write_bytes(1, b, 1);\n")  # R4 marker if scanned
+                f.write(_walker_marker(rel))
         flagged = {rel for rel, _, _, _ in scan_tree(root)}
         for rel, scanned in cases:
             if (rel in flagged) != scanned:
@@ -319,10 +685,15 @@ def _tree_walker_test():
 def self_test():
     failures = 0
     for path, snippet, expected in SELF_TEST_CASES:
+        started = time.monotonic()
         got = {rule for _, rule, _ in check_source(path, snippet)}
+        elapsed = time.monotonic() - started
         if got != expected:
             failures += 1
-            print(f"self-test FAIL {path}: expected {sorted(expected)}, got {sorted(got)}: {snippet!r}")
+            print(f"self-test FAIL {path}: expected {sorted(expected)}, got {sorted(got)}: {snippet[:80]!r}")
+        if elapsed > CASE_TIME_LIMIT_S:
+            failures += 1
+            print(f"self-test FAIL {path}: took {elapsed:.2f} s (limit {CASE_TIME_LIMIT_S} s): {snippet[:80]!r}")
     for snippet, line in LINE_NUMBER_CASES:
         got = [l for l, _, _ in check_source("main/main.c", snippet)]
         if got != [line]:
