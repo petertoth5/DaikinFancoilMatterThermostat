@@ -1,6 +1,6 @@
 # 010 - `reg_model` + `poll_sched`: register state, polling schedule, link health, transaction log (pure)
 
-Phase: 1. Status: implemented 2026-11-24 (build-verifier PASS, firmware-reviewer APPROVE WITH MINORS); amendment applied and accepted 2026-11-24 (v0.3, 2026-11-08; amended 2026-11-09 and 2026-11-24: user decisions and reviewer minors marked below). Depends on: 009. May run in parallel with 002.
+Phase: 1. Status: implemented 2026-11-24 (build-verifier PASS, firmware-reviewer APPROVE WITH MINORS); amendment applied and accepted 2026-11-24 (v0.3, 2026-11-08; amended 2026-11-09 and 2026-11-24: user decisions and reviewer minors marked below; amended 2026-11-24, user decision: 006 review: `poll_sched_cancel_manual`, status: implemented (b8ad00d) (amended 2026-11-24, user decision: 006 accepted)). Depends on: 009. May run in parallel with 002.
 Review: `firmware-reviewer` reviews this task independently (it decides what goes on the bus and how often).
 
 ## Goal
@@ -18,6 +18,8 @@ No IDF, FreeRTOS or esp-modbus includes. Time = `int64_t` ms from an injected cl
 - `firmware/test/host/main/CMakeLists.txt` (append `reg_model poll_sched` to `REQUIRES`)
 
 All components `-Wall -Wextra -Werror`.
+
+Ownership grant (amended 2026-11-24, user decision: 006 review): the 006 review follow-up owns `poll_sched.h`, `poll_sched.c` and `test_host/test_poll_sched.c` for the `poll_sched_cancel_manual` change and its host test only; nothing else in these files changes.
 
 ## Wiki pages relied on
 - `concepts/firmware-architecture`, sections "1. Phases and exit criteria" (items 4-7), "2. Components and threading", "3. Bus-safety rules" (Timing D16, Polling D6, Read errors and health D21, Fallbacks), "6. Decisions"
@@ -69,6 +71,7 @@ void poll_sched_stop(poll_sched_t *s);                         /* -> STOPPED unl
 void poll_sched_latch(poll_sched_t *s);                        /* -> LATCHED, permanent until re-init (reboot) */
 int  poll_sched_set_addr(poll_sched_t *s, uint8_t addr, int64_t now_ms); /* 1..247 else -1; clears unsupported marks, counter, pending work; DEGRADED/OFFLINE -> ONLINE with all polled regs due now; STOPPED/LATCHED kept */
 int  poll_sched_request_manual(poll_sched_t *s, uint16_t reg, uint16_t qty); /* -1: LATCHED, !daikin_regs_read_allowed, or one pending */
+void poll_sched_cancel_manual(poll_sched_t *s);                /* clears a pending MANUAL request only; no-op if none (amended 2026-11-24, user decision: 006 review) */
 int  poll_sched_request_sweep(poll_sched_t *s);                /* -1: LATCHED or a sweep running (= from request until its last read is issued) */
 bool poll_sched_next(poll_sched_t *s, int64_t now_ms, ps_req_t *out, int64_t *wait_until_ms);
 void poll_sched_complete(poll_sched_t *s, const ps_txn_t *t);
@@ -100,7 +103,7 @@ Sweep "running" (amended 2026-11-24, reviewer minor): a sweep is running from `r
 6. EXCEPTION code 02 on POLL, RETRY, SWEEP or MANUAL qty 1: register `unsupported` until reboot (or `set_addr`), never polled again (D21; RETRY added: amended 2026-11-24, user decision). HEALTH is excluded. Other exception codes: not retried, backoff as rule 4, not counted in rule 7 (user-approved 2026-11-09).
 7. Consecutive-failure counter: +1 per final TIMEOUT/BAD_FRAME/ERROR of POLL or HEALTH; reset by any OK or EXCEPTION of those kinds. Health: 0 -> ONLINE, 1..`offline_after`-1 -> DEGRADED (user-approved 2026-11-09), reaching `offline_after` -> OFFLINE (first HEALTH at `t_end + offline_probe_ms`). No RETRY can be pending at that moment: a failure that queues a RETRY does not change the counter, so OFFLINE is only entered on a final failure (amended 2026-11-24, reviewer minor; the defensive clear in code may stay, it is not tested).
 8. OFFLINE: the only **automatic** traffic is HEALTH reads of reg 000, qty 1, every `offline_probe_ms` after the previous one ended; OK -> ONLINE with every polled reg due at `t_end`. SWEEP is suspended while OFFLINE. MANUAL is allowed while OFFLINE (amended 2026-11-24, user decision): once, no retry, gap (rule 2) applies, no effect on counter, health or the HEALTH schedule (an OK MANUAL read does not end OFFLINE).
-9. STOPPED: no POLL/HEALTH; MANUAL and SWEEP allowed. LATCHED: `next` always false with `INT64_MAX`; MANUAL and SWEEP refused.
+9. STOPPED: no POLL/HEALTH; MANUAL and SWEEP allowed. LATCHED: `next` always false with `INT64_MAX`; MANUAL and SWEEP refused. `poll_sched_stop` keeps a pending MANUAL (it is allowed while STOPPED); `poll_sched_cancel_manual` is the only way to drop it (amended 2026-11-24, user decision: 006 review; used by `mb silence`, 006 M3). It acts in every state, clears only the pending MANUAL slot and changes nothing else (health, counter, schedule, RETRY, SWEEP, unsupported marks, stats, `last_end`); afterwards `request_manual` may be called again.
 10. SWEEP: every documented register (all 32, ascending) once, qty 1, no retry, no effect on counter/health/schedule except rule 6. MANUAL: qty 1..4, once, no retry, no effect except rule 6.
 11. Every completed transaction updates `ps_stats_t`; answered ones (OK, EXCEPTION) add `t_end - t_start` to the histogram (clamped to the last bucket) and min/max.
 12. Address mismatch (amended 2026-11-24, reviewer minor; conservative option): a completion whose `req.addr` differs from the current `cfg.addr` (in flight across `set_addr`) updates only `ps_stats_t` (rule 11) and `last_end` (rule 2: the bus was used); it has no effect on counter, health, retry, schedule, unsupported marks or the model. Contract for callers: `bus_task` calls `set_addr` only between `poll_step` calls (it is the single caller and `poll_step` is synchronous), so the rule is a defensive backstop for direct `next`/`complete` users.
@@ -140,6 +143,7 @@ Format functions return 0 (buf NUL-terminated when `n > 0`) for an out-of-range 
   - Rule 12: request issued for addr 1, `set_addr(2)`, completion with addr 1 (TIMEOUT, EXC 02, OK) -> no retry, counter/health/unsupported/due unchanged, stats counted, next request still waits `gap` after its `t_end`; `poll_step` variant with a fake link that calls `set_addr` during the call -> model untouched.
   - Sweep: `request_sweep` returns -1 until the 32nd read is issued and 0 right after it (before its completion).
   - Mixed-kind soak (`poll_step`, fake clock advanced to `wait_until`, fake link with varying latency and a scripted mix of OK / TIMEOUT / EXC 02 / other EXC, incl. an OFFLINE episode and recovery, injected MANUAL and SWEEP requests, at least 2 h simulated): every issued request has `t_start >= previous t_end + gap_ms`, and every kind POLL/RETRY/HEALTH/SWEEP/MANUAL occurs at least once.
+- Amendment 2026-11-24 (006 review, user decision), one test case in `test_poll_sched.c`: in STOPPED, `request_manual(15, 1)` and `request_sweep()` pending, `cancel_manual` -> `next` returns the SWEEP (no MANUAL), health still STOPPED, stats unchanged; `request_manual` returns 0 again afterwards; `cancel_manual` with nothing pending is a no-op (state and next request unchanged, also when ONLINE: next is still the due POLL).
 - `txn_log`: exact strings per res and kind; round trip parse(format(x)) == x; ignored lines (`I (123) foo`, empty, `#...`); malformed cases; truncation; out-of-range kind/res/health -> 0 (amended 2026-11-24).
 
 ## Recommended implementer model

@@ -392,6 +392,38 @@ User decision in the session of 2026-11-24, not in raw (user decision, session 2
 | K4 | Acceptance | **Accepted 2026-11-24** (user). Committed and pushed as `987fbd1` ("Add rs485_port and mb_link FC03 read path over own RTU codec (task 014)") |
 | K5 | Not verified on hardware | The DE and ISR facts (rows in section 4) remain project evidence from the IDF source; on-board checks are in task 008 (open questions Q-HW1 / Q-HW2, section 8) |
 
+### Task 006 review decisions (user, 2026-11-24)
+
+User decision in the session of 2026-11-24, not in raw (user decision, session 2026-11-24), taken after the task 006 implementation and the `firmware-reviewer` review (APPROVE WITH MINORS, section 7). The `architect` amends specs 006, 008 and 010 (`tasks/`, not touched by the wiki-keeper). **Status 2026-11-24: T1–T7 applied, re-verified and task 006 accepted 2026-11-24** (subsection "Task 006 acceptance" below); committed and pushed as `b8ad00d`.
+
+Fix all minors before commit (user):
+
+| # | Topic | Decision |
+|---|---|---|
+| T1 | Boot hint | Derived from the real state; never "silence ok" while the bus is latched |
+| T2 | Status snapshot | Published at boot and when `mb silence` stops polling |
+| T3 | `mb silence` and a pending manual read | `mb silence` cancels a pending manual read; small `poll_sched` API addition; spec 010 amended |
+| T4 | Console UART | Runtime check that the console UART is not the bus UART, before `bus_task` starts |
+| T5 | Fault wording | "faults since boot" wording; one `# mb_link: port fault ...` comment line after a fault |
+| T6 | `log_out` | Priority comment on `log_out` |
+| T7 | Reviewer on-site checks | The reviewer's 7 on-site checks are added to spec 008: stack high-water after boot and after `mb silence 1` (see section 8, `bus_task` 4 KB stack); abort path checked by absence of T lines; wait out `mb silence`; pending read cancelled; no "queue free spaces" line; latch lines; console port |
+
+Verification at implementation (session facts, verified output, not in raw): `build-verifier` PASS: fresh esp32s3 build 0 warnings; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: mb_link_read, mb_rtu_build_fc03 present`; image 236 KB, 77% of the app partition free; no Wi-Fi, lwip, netif, BT or Matter code linked (`nvs_flash` and `esp_phy` members are force-included by the IDF startup, not used by project code); host 118 / 0 / 0; no dependency added. `firmware-reviewer`: boot order, single-owner rule, non-blocking output, console-off-bus-UART guard and timing loop verified.
+
+The 006 image has no flash/NVS load command, so Q-HW2 (section 8) stays open.
+
+### Task 006 acceptance (user, 2026-11-24)
+
+User decision in the session of 2026-11-24, not in raw (user decision, session 2026-11-24). The fixes below are session facts (verified output of `build-verifier` and `firmware-reviewer`), not in raw. The session labels the fixes M1–M6 and the spec checks T7; in this wiki the same items are T1–T6 (M1 = T1 … M6 = T6, T7 = spec 008 checks).
+
+| # | Topic | Decision / status |
+|---|---|---|
+| V1 | T1–T7 applied | **Done 2026-11-24** (session facts): T1 boot hint derived from the real state; `silence_running` flag (confirmed by the user) and the `# silence check: started <s> s` line; `mb status` shows `boot silence: <ms> ms, activity running` for any running check. T2 status snapshot published at boot and around `mb silence`. T3 new `poll_sched_cancel_manual`, called by `mb silence` (spec 010 amended). T4 console-UART runtime check right after the hold and before `bus_task` starts; on failure nothing starts and the hold stays. T5 `faults since boot`, one `# mb_link: port fault, link closed ...` line on transition. T6 priority comment on `log_out`. T7 the reviewer's 7 on-site checks are in spec 008 (section 8) |
+| V2 | Verification | `build-verifier` PASS: fresh esp32s3 build 0 warnings; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: mb_link_read, mb_rtu_build_fc03 present`; guard proof: a build with a missing required symbol fails; image 236819 bytes, about 77 % of the 1 MB app partition free; no Wi-Fi, lwip, netif, BT or Matter code linked; host 119 Tests, 0 Failures (new `poll_sched` cancel-manual test passes). No dependency added |
+| V3 | Re-review | `firmware-reviewer` re-review: **APPROVE**. Minor (shared status text): spec aligned to the code |
+| V4 | Acceptance | **Accepted 2026-11-24** (user). Firmware committed and pushed as `b8ad00d` ("Add bus_task, mb probe console and app_main (task 006)") |
+| V5 | Not verified on hardware | This is the **first flashable phase-1 probe image**; it has not been run on hardware yet. The `bus_task` 4 KB stack is still to be verified on site (section 8). Q-HW1 and Q-HW2 stay open (section 8) |
+
 ### Recorded conflict (D19)
 
 **Conflict (D19, recorded, not resolved):** the manual gives the address range 1–255 for reg 200 ([[concepts/device-addressing]], p4) while the Modbus spec reserves 248–255 *(external)*; the node accepts only 1..247. Also not stated: which port the address applies to, and "Address 001 – Leave free!" (p7) vs default 1 ([[concepts/device-addressing]]).
@@ -412,6 +444,10 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 
 **Update 2026-11-24, task 014 accepted (session facts, verified output, not in raw; pushed as `987fbd1`):** the M1–M4 fixes (section 6 "Task 014 review decisions") were applied by `firmware-dev` (sonnet), re-checked by `build-verifier` (PASS, see section 6 "Task 014 acceptance", K2) and the `firmware-reviewer` re-review (APPROVE). **User accepted task 014 on 2026-11-24**; the firmware is committed and pushed as `987fbd1`. **Task 014 done.** Next: 006 (bus_task, probe console, `app_main`; firmware-dev sonnet, then build-verifier and firmware-reviewer), 011 (can run in parallel), then 008. Task 008 needs the user's answers to open questions Q-HW1 and Q-HW2 (section 8).
 
+**Update 2026-11-24, task 006 accepted (session facts, verified output, not in raw):** T1–T7 applied (section 6 "Task 006 acceptance", V1–V2), `firmware-reviewer` re-review APPROVE. **User accepted task 006 on 2026-11-24**; the firmware is committed and pushed as `b8ad00d`. **Task 006 done.** It is the first flashable phase-1 probe image; it has not been run on hardware. Next: 011 (fake-slave host tests, firmware-dev sonnet), then 008 (on-site checklist, needs Q-HW1 / Q-HW2). The on-site probe by the user follows, then the probe log goes into `raw/` for `/capture`.
+
+**Update 2026-11-24, task 006 implemented and verified, minors in progress (session facts, verified output, not in raw; not committed):** `firmware-dev` (sonnet) implemented `bus_task` (single owner of the bus), the probe console `mb ...` and `app_main`: the first flashable probe image. `build-verifier` PASS and `firmware-reviewer` APPROVE WITH MINORS (details and checks in section 6 "Task 006 review decisions", T1–T7). The user decided to fix all minors before commit. **Next:** the architect amends specs 006, 008 and 010 (running); then `firmware-dev` applies T1–T6, then `build-verifier` and `firmware-reviewer` again, then user acceptance; commit only on request. Then 011 and 008. **`bus_task` stack of 4 KB** is not yet proven: it is checked on site (section 8).
+
 | Task | Change |
 |---|---|
 | 001 | modify: new Kconfig (UART port, RX/TX/DE GPIO, baud, slave address, timeouts, poll periods, `CONFIG_DMT_BUS_WRITE` = n); lint -> `check_bus_access.py`; host runner unchanged |
@@ -422,14 +458,14 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 | 003 | retire |
 | 004 | retire (ideas go into `reg_model` / `poll_sched`) |
 | 005 | retire (RX-only listen survives as the silence check in `rs485_port`) |
-| 006 | modify: poll loop + probe console |
+| 006 | modify: poll loop + probe console (`bus_task`, `mb` console, `app_main`; first flashable probe image). **Done, accepted 2026-11-24, committed and pushed as `b8ad00d`** (section 6 "Task 006 review decisions" T1–T7 and "Task 006 acceptance" V1–V5); `firmware-reviewer` APPROVE WITH MINORS, re-review APPROVE; not yet run on hardware |
 | 007 | retire, replaced by 011 |
 | 008 | modify: on-site probe checklist + log template, items 1–11 (section 1) |
 | 009 | new: `daikin_regs` |
 | 010 | new: `reg_model` + `poll_sched` |
 | 011 | new: fake-slave host tests |
 
-Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 -> 008; 011 any time**. *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
+Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 (done, accepted 2026-11-24, pushed as `b8ad00d`) -> 008; 011 any time**. Next: 011, then 008. *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
 
 ## 8. Open items and risks
 
@@ -451,6 +487,8 @@ Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committ
 - Fallback E1b (esp-modbus) remains available if E2 is too hard to debug on site; revert is a separate user decision (section 2).
 - **Risk (new 2026-11-24, task 014 review):** a flash or NVS stall (Matter activity) during our transmit can delay the DE release if the TX_DONE ISR is not in IRAM, and DE then stays high on the shared line. Mitigation: `CONFIG_UART_ISR_IN_IRAM=y` with build guard M2 (section 3); concurrent flash/NVS activity is one of the DE checks on site (task 008, section 6 "Task 014 review decisions") *(inferred mechanism; reviewer, project evidence)*.
 - **Risk (new 2026-11-24, task 014):** `gap_bytes` and `max_byte_interval_us` are approximate (M3). Quote them only as bounds in the probe log.
+- **Risk (new 2026-11-24, task 006; still open after acceptance):** the `bus_task` stack of 4 KB is not yet proven. Keep it as a to-verify risk: check on site with the stack high-water mark after boot and after `mb silence 1` (task 008 reviewer check, section 6 "Task 006 review decisions" T7); if the margin is too small, the stack size is a new user decision *(session facts, not in raw)*.
+- **Open (2026-11-24, after 006 acceptance):** the probe image has not run on hardware. Q-HW1 and Q-HW2 remain open (above).
 - RMW race on 201 accepted.
 - How Matter ecosystems render the Fan endpoint *(external)*.
 - `CONFIG_UART_ISR_IN_IRAM`: resolved 2026-11-09, kept (section 6).
