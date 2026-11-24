@@ -122,3 +122,27 @@ No raw files added or changed. Session implementation facts (verified build/test
 - concepts/project-goal: tasks line, 001 done, 009 next.
 - concepts/dev-environment: new "Host build facts" section (`idf.py --preview set-target linux`, `libbsd-dev` needed, user action pending; esp-clang/clang-tidy not installed; lint stdlib Python on every build); open question 3.
 - index.md summaries for project-goal, dev-environment, firmware-architecture.
+
+## [2026-11-24] sync | task 010 decisions U1-U4
+No raw files added or changed. User decisions (session 2026-11-24, not in raw) and session implementation facts (verified build/test output, not in raw).
+- Task 010 (`reg_model` + `poll_sched` + `txn_log`) implemented by `firmware-dev`; `build-verifier` PASS (esp32s3 target 0 warnings; host tests 85/0 failures/0 ignored; lint + 82-case self-test clean; deps registry-only; clang-tidy skipped, not installed); `firmware-reviewer` APPROVE WITH MINORS (no blocker/major). Not yet accepted, not committed.
+- concepts/firmware-architecture: new section 6 subsection "Task 010 detail decisions (user, 2026-11-24)" with U1–U4; section 3 "Read errors and health" and "Fallbacks" adjusted (manual read while OFFLINE, other exceptions not unsupported in `reg_model`, exc 02 on RETRY = unsupported, `mb poll on` no-op unless STOPPED, `mb addr` reset); section 7 update (009 done, 010 status); header addendum.
+- concepts/project-goal: tasks line (009 done, 010 status).
+- index.md summaries for project-goal and firmware-architecture.
+
+## [2026-11-24] sync | task 010 decisions U5-U6, spec 010 amended
+No raw files added or changed. User decisions (session 2026-11-24, not in raw): U5 and U6 are architect proposals confirmed by the user. Spec `tasks/010-reg-model-poll-sched.md` amended by the architect (read only here, not edited by the wiki-keeper).
+- concepts/firmware-architecture: header addendum and section 6 "Task 010 detail decisions" intro updated (U1–U6, spec amendment done incl. reviewer minors: `reg_model_set_exception`, txn_log enum bounds check, mixed-kind gap soak test); rows U5 (HEALTH exc 02 on 000 = failed read, not unsupported) and U6 (completion for old address after `mb addr` = statistics and `last_end` only; `bus_task` calls `set_addr` only between `poll_step` calls) added; section 7 status: amendment done, firmware-dev (sonnet) follow-up in progress, then build-verifier + firmware-reviewer re-check.
+- index.md summary for firmware-architecture updated (U1–U6).
+- Not changed, flagged: concepts/firmware-architecture section 3 "Read errors and health" still says "Exception 02 -> register unsupported" without the HEALTH exclusion of U5 (U3/U5 keep HEALTH out of the unsupported rule); concepts/project-goal and its index summary still say the spec amendment is pending.
+
+## [2026-11-24] sync | task 010 accepted
+No raw files added or changed. Session implementation facts (verified build/test output, not in raw; nothing committed).
+- Task 010 (`reg_model` + `poll_sched` + `txn_log`) amended and re-worked by `firmware-dev` (sonnet) after the spec amendment U1–U6 and reviewer minors: `reg_model_set_exception`, `poll_sched` start no-op unless STOPPED, RETRY in rule 6, rule 12 address mismatch, txn_log enum bounds, tests for U1–U6, rule 12, sweep end and a 2 h mixed-kind gap soak.
+- `build-verifier` re-check PASS: esp32s3 fresh build 0 warnings; host tests 100 Tests, 0 Failures, 0 Ignored, exit 0; bus-access lint and 82-case self-test clean; no `esp_`/FreeRTOS includes; dependencies registry-only; clang-tidy SKIPPED (not installed).
+- `firmware-reviewer` re-review: APPROVE, no findings of substance. FYI, no change: `mb poll off` then `mb poll on` from OFFLINE restarts polling immediately (consequence of U4, bounded by the 5-failure re-entry).
+- Task 010 accepted 2026-11-24.
+- Open hygiene minor: host build prints 4 CMake `component_validation` warnings because `firmware/test/host/main/CMakeLists.txt` globs component `test_host` sources into main (pre-existing pattern from 009, cosmetic). Known: `idf.py set-target linux` needs `--preview`.
+- concepts/firmware-architecture: section 3 "Read errors and health" exception-02 line now states its scope (POLL/RETRY/SWEEP/MANUAL qty 1, not HEALTH; U3, U5); section 7 status: 010 done, 002 next.
+- concepts/project-goal: tasks line (001, 009, 010 done; 002 next); index summary no longer "amendment pending".
+- index.md summaries for project-goal and firmware-architecture updated.
