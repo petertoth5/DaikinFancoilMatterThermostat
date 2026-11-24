@@ -137,6 +137,11 @@ int poll_sched_set_addr(poll_sched_t *s, uint8_t addr, int64_t now_ms)
     return 0;
 }
 
+void poll_sched_cancel_manual(poll_sched_t *s)
+{
+    s->manual_pending = false;
+}
+
 int poll_sched_request_manual(poll_sched_t *s, uint16_t reg, uint16_t qty)
 {
     if (s->health == PS_LATCHED || !daikin_regs_read_allowed(reg, qty) || s->manual_pending) {

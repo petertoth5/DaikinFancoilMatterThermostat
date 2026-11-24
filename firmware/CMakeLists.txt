@@ -12,7 +12,7 @@ add_custom_target(bus_access_lint
 add_dependencies(${CMAKE_PROJECT_NAME}.elf bus_access_lint)
 
 # Symbols the image must contain. Empty until 006 links the read path (006 sets: mb_link_read,mb_rtu_build_fc03).
-set(DMT_ELF_REQUIRED_SYMBOLS "")
+set(DMT_ELF_REQUIRED_SYMBOLS mb_link_read,mb_rtu_build_fc03)
 
 # ELF symbol check on the linked image: self-test first, then the check. Either failing fails the build.
 set(dmt_elf_check_args --nm ${CMAKE_NM})

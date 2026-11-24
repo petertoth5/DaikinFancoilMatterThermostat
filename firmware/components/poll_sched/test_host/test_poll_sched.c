@@ -1000,6 +1000,28 @@ static void assert_sched_same(const poll_sched_t *a, const poll_sched_t *b)
     TEST_ASSERT_EQUAL_MEMORY(a->due_ms, b->due_ms, sizeof(a->due_ms));
 }
 
+TEST_CASE("poll_sched rule 9: cancel_manual drops only the pending MANUAL", "[poll_sched]")
+{
+    ps_config_t c = base_cfg();
+    setup(&c);
+    TEST_ASSERT_EQUAL(0, poll_sched_request_manual(&S, 15, 1));
+    TEST_ASSERT_EQUAL(0, poll_sched_request_sweep(&S));
+    ps_stats_t before, after;
+    poll_sched_get_stats(&S, &before);
+    poll_sched_cancel_manual(&S);
+    expect_req(take(), PS_KIND_SWEEP, daikin_regs_at(0)->reg);       /* SWEEP survives, no MANUAL */
+    TEST_ASSERT_EQUAL(PS_STOPPED, poll_sched_health(&S));
+    poll_sched_get_stats(&S, &after);
+    TEST_ASSERT_EQUAL_MEMORY(&before, &after, sizeof(before));
+    TEST_ASSERT_EQUAL(0, poll_sched_request_manual(&S, 15, 1));      /* slot is free again */
+
+    setup_running(&c);                                               /* nothing pending: no-op */
+    poll_sched_t ref = S;
+    poll_sched_cancel_manual(&S);
+    assert_sched_same(&ref, &S);
+    expect_req(take(), PS_KIND_POLL, daikin_regs_at(0)->reg);        /* still the due POLL */
+}
+
 TEST_CASE("poll_sched U4: start is a no-op in ONLINE, DEGRADED and OFFLINE", "[poll_sched]")
 {
     ps_config_t c = base_cfg();

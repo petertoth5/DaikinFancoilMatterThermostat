@@ -57,6 +57,7 @@ void poll_sched_stop(poll_sched_t *s);                         /* -> STOPPED unl
 void poll_sched_latch(poll_sched_t *s);                        /* -> LATCHED, permanent until re-init (reboot) */
 int  poll_sched_set_addr(poll_sched_t *s, uint8_t addr, int64_t now_ms); /* 1..247 else -1; clears unsupported marks, counter, pending work; DEGRADED/OFFLINE -> ONLINE, all polled regs due now; STOPPED/LATCHED kept */
 int  poll_sched_request_manual(poll_sched_t *s, uint16_t reg, uint16_t qty); /* -1: LATCHED, !daikin_regs_read_allowed, or one pending */
+void poll_sched_cancel_manual(poll_sched_t *s);                /* clears a pending MANUAL request only; no-op if none */
 int  poll_sched_request_sweep(poll_sched_t *s);                /* -1: LATCHED or a sweep running (from request until its last read is issued) */
 bool poll_sched_next(poll_sched_t *s, int64_t now_ms, ps_req_t *out, int64_t *wait_until_ms);
 void poll_sched_complete(poll_sched_t *s, const ps_txn_t *t);
