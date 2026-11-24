@@ -24,14 +24,14 @@ Next (amended 2026-11-24, user decision: 006 accepted; Q-HW1/Q-HW2 answered 2026
 
 Order and why (amended 2026-11-24): 012 first (pure, no lint impact); 013 next, because the current lint bans `uart_write_bytes` everywhere and 014 cannot build before it, and its tree scan should see the real `mb_rtu.c`; 014 after both; 006 last among the firmware tasks. The ELF check's required-symbol list starts empty in 013 and is filled by 006, because `--gc-sections` drops `mb_link_read` until `app_main` reaches it. 011 may run any time (needs only 010). 008 may be drafted early and is finalised after 006 and 014.
 
-Escalations that stop the pipeline (user decision): 014 DE/RTS deviations (RTS not asserted on the TX path, DE high outside our transmit, mode-before-pin order impossible), no per-byte RX timing (end-of-frame rule), any need for line inversion or a lint relaxation; 008 boot silence activity on the bench or on site, `BADFRAME` without a slave on the bench (B.4), multimeter DE average near 3.3 V during `mb probe` on the bench (B.6.b; amended 2026-11-24, user decision).
+Escalations that stop the pipeline (user decision): 014 DE/RTS deviations (RTS not asserted on the TX path, DE high outside our transmit, mode-before-pin order impossible), no per-byte RX timing (end-of-frame rule), any need for line inversion or a lint relaxation; 008 boot silence activity on the bench or on site, `BADFRAME` without a slave on the bench (B.4), multimeter DE average near 3.3 V during `mb probe` on the bench (B.6.b; amended 2026-11-24, user decision), `link counters: n/a` still shown after the first `H` line (B.4, B.5, D.8a; amended 2026-11-24, user decision).
 
 ## Decisions 2026-11-24 on 012/013/014 (amended 2026-11-24, user decision)
 - Gap bytes before a request (014 rule 2): counted and discarded, the request is still sent (default kept).
 - `mb_link_get_counters` (`gap_bytes`, `faults`, `max_byte_interval_us`) shown in `mb status`: approved.
 - No host test of `mb_link` with a fake `rs485_port` (D12 unchanged); refusal order is a code-inspection item in 014.
 - Exception code 0x00 -> `BAD_FRAME` (012): approved.
-- No `CONFIG_FREERTOS_HZ` change and no bench simulator task; the 10-20 ms end-of-frame wait at 100 Hz is a documented known limit (014 rule 4).
+- No `CONFIG_FREERTOS_HZ` change and no bench simulator task; the end-of-frame wait of about 20-30 ms at 100 Hz is a documented known limit (014 rule 4; amended 2026-11-24, user decision; was 10-20 ms).
 - E2 stays the implementation; E1b (esp-modbus `==2.1.4`) is a documented fallback only, nothing of it is built: see 014 "Fallback E1b". A revert is a separate user decision.
 
 ## Seam rule (normative; amended 2026-11-24, user decision)

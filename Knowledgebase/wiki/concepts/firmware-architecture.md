@@ -25,7 +25,7 @@ No Matter, no Wi-Fi, FC03 only, write code compiled out (`CONFIG_DMT_BUS_WRITE=n
 3. Silence check saw no foreign traffic on "A A B B -" (tests the inferred "panel is slave", [[entities/ekwhctrl1]]).
 4. Table of **every** documented register, starred and unstarred (p4, [[concepts/register-map]]): OK with raw/scaled value, or exception + code, or timeout.
 5. Does FC03 with quantity > 1 work (e.g. 200..203 qty 4)? Not stated in the manual ([[concepts/modbus-rs485-link]]).
-6. Response time min/median/max over ≥ 1000 transactions. *(2026-11-24, user decision, session 2026-11-24, section 6 "Spec 008 finalisation" F2: answered by the whole-transaction time `dur_ms` plus a derived upper bound for the slave turnaround (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument".)*
+6. Response time min/median/max over ≥ 1000 transactions. *(2026-11-24, user decision, session 2026-11-24, section 6 "Spec 008 finalisation" F2: answered by the whole-transaction time `dur_ms` plus a derived upper bound for the slave turnaround (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument".)* *(Amended 2026-11-24, user decision, session 2026-11-24: bound tightened to about `dur_ms` - 34 ms, because the end-of-frame wait is about 20–30 ms, not 10–20 ms; sanity check: an OK qty-1 transaction has `dur_ms` ≥ about 36 ms; section 6 "Task 008 docs review decisions".)*
 7. ≥ 1 h polling at the proposed rate (section 3), error rate < 1 %, no panel anomaly (display, icons, error codes, local keys).
 8. Local keypress correlation: setpoint up/down (231 vs 008), each fan mode (order of 201 bits 0–2), season (233 values 3/5), standby (201 bit 7).
 9. Does the panel show anything when polled (e.g. WEB icon, 247 flag 0, [[concepts/web-restriction-flags]])?
@@ -88,7 +88,7 @@ The manual states no timing, polling interval, response time or exception codes 
 - One transaction at a time; gap ≥ 100 ms after each.
 - Reference: t3.5 ≈ 4.0 ms at 9600 baud with 11-bit characters *(external, Modbus serial-line spec)*.
 - **Gap bytes** (bytes received before a request, e.g. late replies or foreign traffic): counted in the `rs485_port` counters and discarded; the request is still sent (user, 2026-11-24).
-- `CONFIG_FREERTOS_HZ` stays at **100 Hz** (1000 Hz rejected, user, 2026-11-24); the resulting end-of-frame silence window of 10–20 ms is a known, accepted limit (user, 2026-11-24).
+- `CONFIG_FREERTOS_HZ` stays at **100 Hz** (1000 Hz rejected, user, 2026-11-24); the resulting end-of-frame silence window ~~of 10–20 ms~~ of **about 20–30 ms** is a known, accepted limit (user, 2026-11-24). *(Amended 2026-11-24: the earlier "10–20 ms" was wrong. The wait in `rs485_port.c:413` is (ceil(t3.5 / tick) + 1) × tick = 20 ms at 9600 baud / 100 Hz, measured from the last received byte, plus up to about one tick, so about 20–30 ms in total (session facts, verified output, not in raw; architect finding, checked in the code by the orchestrator). The code is fine, because a wait longer than t3.5 is allowed. Only the text was wrong. Spec 014 rule 4 and spec 008 had the same wrong figure; the architect is amending them (in progress). Text corrected by user decision, session 2026-11-24; section 6 "Task 008 docs review decisions".)*
 - **`CONFIG_UART_ISR_IN_IRAM=y` is load-bearing for DE (user, 2026-11-24, `firmware-reviewer` on task 014):** DE is released in the UART TX_DONE ISR (section 4). If that ISR is not in IRAM, a flash or NVS stall (Matter activity) can delay the release and hold DE high after our request. Build guard M2 (`#error` if the option is off) and section 8 risk.
 - **Counters are approximate (user decision, 2026-11-24, M3):** `gap_bytes` is a lower bound and `max_byte_interval_us` is approximate. Do not quote them as exact values in the probe log (section 6 "Task 014 review decisions").
 - Response timeout 500 ms in P1; after the probe: max(3 × observed max, 100 ms).
@@ -304,7 +304,7 @@ User statements in the session of 2026-11-24, not in raw (user decision, session
 | — | Seam types and `measured` flag | `mb_link.h` has its own `mb_link_port_cfg_t` and `mb_link_counters_t { bool measured; uint32_t gap_bytes, faults, max_byte_interval_us; }` and does not include `rs485_port.h` (seam rule, spec 014). Under E2 `measured = true`. Under the E1b fallback `measured = false`, values 0, and `mb status` prints `link counters: n/a`, so a fallback log is never mistaken for a real 0 measurement. User approved keeping the flag (architect proposal) |
 | — | `mb_link` host test | With a fake `rs485_port`: **rejected**; refusal-before-port-call is proven by code inspection instead |
 | — | Exception code 0x00 | A reply with exception code 0x00 -> BAD_FRAME |
-| — | Rejected extras | `CONFIG_FREERTOS_HZ=1000` (stay at 100 Hz; end-of-frame silence window 10–20 ms is a known limit); a bench slave-simulator task |
+| — | Rejected extras | `CONFIG_FREERTOS_HZ=1000` (stay at 100 Hz; end-of-frame silence window ~~10–20 ms~~ about 20–30 ms is a known limit; *amended 2026-11-24, section 3 "Timing"*); a bench slave-simulator task |
 | — | Agent definitions | `.claude/agents/architect.md` and `orchestrator.md` corrected by the orchestrator (user-approved) from "second master on the EKWHCTRL1 <-> INN-FR-B32 bus" to "sole master on the EKWHCTRL1 'A A B B -' port", matching D1 |
 | — | Task order | 012 -> 013 -> 014 -> 006 -> 008; 011 any time; all implemented by `firmware-dev` on sonnet; 012, 013 and 014 each get an independent `firmware-reviewer` review. 002 is a retired note (section 7) |
 | — | DE safety (independent of E2) | `uart_set_mode(RS485 half-duplex)` before `uart_set_pin`; after driver delete, write DE level 0, then enable the output; both added to the code-inspection checklists (section 4) |
@@ -376,9 +376,9 @@ Spec 008 (on-site, amended by the architect; section 8 and `tasks/008`):
 | # | Topic | Decision |
 |---|---|---|
 | 008-a | DE scope on site | Check DE at boot, at open, per transaction, with concurrent flash/NVS activity, at the silence check, and at close. *(Update 2026-11-24: no instrument (Q-HW1), the six DE timing items are "not measured"; the flash/NVS run is deferred to phase 2 (Q-HW2); section 6 "Spec 008 finalisation")* |
-| 008-b | Slave turnaround | Measure the slave turnaround on site. ***Replaced 2026-11-24** (user decision, session 2026-11-24) by F2 in "Spec 008 finalisation" below: `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, "derived, not measured"); pure turnaround "unknown, no instrument"* |
+| 008-b | Slave turnaround | Measure the slave turnaround on site. ***Replaced 2026-11-24** (user decision, session 2026-11-24) by F2 in "Spec 008 finalisation" below: `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, "derived, not measured"); pure turnaround "unknown, no instrument". *Amended 2026-11-24 (user decision, session 2026-11-24): bound tightened to about `dur_ms` - 34 ms (section 6 "Task 008 docs review decisions")* |
 | 008-c | No slave | No answering slave gives **TIMEOUT** (checked on site) |
-| 008-d | End-of-frame wait | The **10–20 ms** end-of-frame wait is **accepted** (known limit, section 3) |
+| 008-d | End-of-frame wait | The ~~**10–20 ms**~~ end-of-frame wait (**about 20–30 ms**, *amended 2026-11-24*, section 3 "Timing" and section 6 "Task 008 docs review decisions") is **accepted** (known limit, section 3) |
 
 ### Task 014 acceptance (user, 2026-11-24)
 
@@ -436,11 +436,11 @@ The user's answers to the architect's four questions (user decision, session 202
 | # | Topic | Decision |
 |---|---|---|
 | F1 | Heap/leak check after UART driver delete/re-install (008 B.5) | Accepted as "not checked (no heap output in the 006 image)" in phase 1; no change to 006 |
-| F2 | Phase-1 exit item 6, response time (section 1) | Answered by the whole-transaction time `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument". **Replaces 008-b** ("measure the slave turnaround on site", Task 014 review decisions above) |
+| F2 | Phase-1 exit item 6, response time (section 1) | Answered by the whole-transaction time `dur_ms` plus a derived upper bound (about `dur_ms` - 25 ms, logged "derived, not measured"); the pure slave turnaround is "unknown, no instrument". **Replaces 008-b** ("measure the slave turnaround on site", Task 014 review decisions above). *Amended 2026-11-24 (user decision, session 2026-11-24): bound tightened to about `dur_ms` - 34 ms; the basis of both figures is in section 6 "Task 008 docs review decisions"* |
 | F3 | New hard stop (008 B.6.b) | Multimeter averaged DE level near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect. Approved; listed in the Escalations of `tasks/README.md` (session fact) |
 | F4 | Phase-2 DE re-check method without an instrument | Decide later; open question before the phase-2 specs (section 8) |
 
-Status: spec 008 finalised 2026-11-24, **awaiting user approval of the spec** (session fact). *(Update 2026-11-24: approved by the user; docs in progress, see "Spec 008 approval" below.)* The basis of the "about 25 ms" figure in F2 is not stated in the session facts given to the wiki-keeper (open, see section 8).
+Status: spec 008 finalised 2026-11-24, **awaiting user approval of the spec** (session fact). *(Update 2026-11-24: approved by the user; docs in progress, see "Spec 008 approval" below.)* The basis of the "about 25 ms" figure in F2 is not stated in the session facts given to the wiki-keeper (open, see section 8). *(Update 2026-11-24: basis now recorded and the bound tightened to about `dur_ms` - 34 ms; section 6 "Task 008 docs review decisions".)*
 
 ### Task 011 review decisions (user, 2026-11-24)
 
@@ -493,6 +493,72 @@ m7 is test-suite robustness only; it does not affect on-site use, so it has no s
 
 Spec 008 (section "Spec 008 finalisation" above) was **approved by the user on 2026-11-24** (user decision, session 2026-11-24, not in raw). `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md` (in progress, session fact); then `firmware-reviewer`, then user acceptance.
 
+### Task 008 docs review decisions (user, 2026-11-24)
+
+Sources: session facts, verified output, not in raw (`firmware-dev`, `firmware-reviewer`, `architect`, orchestrator checks in the code); user decision, session 2026-11-24. The docs are project files, not raw sources. The wiki-keeper did not read them or the code; file:line references are as reported in the session facts.
+
+Docs and review:
+
+| # | Item | Content |
+|---|---|---|
+| H1 | Docs written | `firmware-dev` (sonnet) wrote `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md` (uncommitted). Every quoted console string is cited to file:line in the 006 code. The orchestrator traced `command not queued: <err>` to `mb_console.c` `queue_command` |
+| H2 | `firmware-reviewer` | **APPROVE WITH MINORS**, no blocker. Major: no checklist step is tagged as transmitting. All deviations accepted: sweep notes, D.2 vs D.3, the `n/a` mention, the summary/B.8 note |
+
+Architect findings (the orchestrator checked them in the code):
+
+| # | Topic | Finding |
+|---|---|---|
+| H3 | `mb probe` while OFFLINE | The sweep (`mb probe`, SWEEP) is suspended while OFFLINE (`poll_sched.c` rule 8, about line 228). Without a slave, auto-polling goes OFFLINE. A B.6.b DE reading taken during an OFFLINE `mb probe` would therefore be a **false pass** (no TX happens). `mb poll off`, `mb silence` and `mb addr` cancel a running sweep |
+| H4 | `link counters: n/a` | That branch returns early, so `faults since boot` is not printed (`mb_console.c` about lines 114–116). `measured` is always true under E2 (`mb_link.c:160`), so `n/a` is expected only just after reset *(inferred)* |
+| H5 | End-of-frame wait (new finding, code vs spec/wiki) | The wait in `rs485_port.c:413` is (ceil(t3.5 / tick) + 1) × tick = 20 ms at 9600 baud / 100 Hz, measured from the last byte, plus up to about one tick: **about 20–30 ms**, not the 10–20 ms stated in spec 014 rule 4, spec 008 and this wiki. The code is fine (longer than t3.5 is allowed); the text was wrong |
+
+**Conflict (recorded, resolved by the user):** spec 014 rule 4, spec 008 and the earlier wiki text say "10–20 ms"; the code gives about 20–30 ms (H5). User decision: the code stays, the texts are corrected. The wiki is corrected with "amended 2026-11-24" notes and the old figure is kept struck through (section 3 "Timing", section 6 rows "Rejected extras" and 008-d, section 8). Specs 008 and 014 are being amended by the architect (in progress, not checked by the wiki-keeper). *(Update 2026-11-24: amended, incl. the two leftover "10–20 ms" statements; section "Task 008 acceptance", P1.)*
+
+Derivation of the turnaround bound *(inferred, from the session facts)*:
+- 9600 baud 8N1 = 10 bits per character = 1.0417 ms per character.
+- FC03 request 8 bytes = 8.33 ms; OK reply for qty 1 = 7 bytes = 7.29 ms; end-of-frame wait W.
+- Timestamps are truncated to ms (error < 1 ms). The reply starts after the request has ended.
+- Turnaround T < `dur_ms` + 1 - (8.33 + 7.29 + W).
+- With W ≥ 10 ms: T < about `dur_ms` - 25 ms. This is the original F2 figure and answers the open question about its basis (section 8).
+- With W ≥ 20 ms (the actual code, H5): T < about `dur_ms` - 34 ms.
+- Sanity check: an OK qty-1 transaction has `dur_ms` ≥ about 36 ms (8.33 + 7.29 + 20 = 35.6 ms).
+
+User decisions (user decision, session 2026-11-24, not in raw). Only the **safety** items are applied (J1–J5); the remaining minors stay open:
+
+| # | Topic | Decision |
+|---|---|---|
+| J1 | Transmit tags | Every step that transmits is tagged `[TRANSMITS]`. UART close/re-open steps are tagged no-TX, with a note that a DE glitch there is possible and not measured |
+| J2 | B.6.b (averaged DE level during `mb probe`) | Unplug USB at once (wording as given in the session facts); run from STOPPED; read during the ~20 s sweep; no `mb poll off` during it (H3: an OFFLINE or cancelled sweep gives a false pass). *Clarified 2026-11-24 (user decision, session 2026-11-24): "unplug USB at once" applies only to the B.6.b hard stop (averaged DE level near 3.3 V during `mb probe`)* |
+| J3 | B.5 | Start `mb probe` from STOPPED. Stop if `faults since boot` changes or a `# mb_link: ... failed` line appears |
+| J4 | D.2 address change | Always `mb poll off` -> `mb addr` -> `mb poll on` |
+| J5 | C.4 | Skip if unsure about the isolation (section 8, isolation of "A A B B -" not stated) |
+| J6 | D.3 | If OFFLINE before or during `mb probe` -> go to D.4, no further probing |
+| J7 | New stop | `link counters: n/a` still shown after the first H line -> record and stop (H4). *Clarified 2026-11-24 (user decision, session 2026-11-24): "first H line" = the first `H <t> <health>` console line after boot* |
+| J8 | Timing figures | Bound tightened to about `dur_ms` - 34 ms; "10–20 ms" corrected to "about 20–30 ms" in spec 008, spec 014 rule 4, the docs and the wiki; sanity check: OK qty-1 `dur_ms` ≥ about 36 ms |
+
+Open minors (excluded by the user, not applied): B.4.2 "started" line wording; `mb probe` is asynchronous / `mb regs` after the last SWEEP; upper edge of the median 10 ms bucket and "answered = OK + EXC"; exact text of the latency line; the 5 s boot window with USB power; C.5 says "in D.3", should be D.2.
+
+Status 2026-11-24: the architect amends spec 008 and spec 014 rule 4 (in progress); then `firmware-dev` updates the docs; then `firmware-reviewer` re-check; then user acceptance; commit on request. *(Update 2026-11-24: done; task 008 accepted, section "Task 008 acceptance" below.)*
+
+### Task 008 acceptance (user, 2026-11-24)
+
+Sources: session facts, verified output, not in raw (`architect`, `firmware-dev`, `firmware-reviewer`, orchestrator checks); user decision, session 2026-11-24. The wiki-keeper did not read the docs, specs or code; step numbers are as reported in the session facts.
+
+| # | Item | Content |
+|---|---|---|
+| P1 | Spec texts corrected (`architect`) | The two leftover "10–20 ms" statements were corrected: spec 014 rule 4 (earlier sentence) now reads "20 ms (2 ticks), measured from the last byte, up to one tick longer"; `tasks/README.md` line 34 now reads "about 20–30 ms". Only "was 10–20 ms" history notes remain in `tasks/`. Closes the H5 text conflict for the specs |
+| P2 | Docs updated (`firmware-dev`) | `docs/phase1-probe/checklist.md` and `measurement-log-template.md` updated to the amended spec 008 (S1–S9 applied). Extra steps tagged `[TRANSMITS]` where the code can transmit: B.4.2; B.5.1 and B.11.1 "only if the 5 s window is missed"; B.7; B.10; B.14.4; D.7 |
+| P3 | `firmware-reviewer` re-review | **APPROVE WITH MINORS**. S1–S9 all verified against the code; the extra tags are correct; nothing unsafe |
+| P4 | Two minors fixed (user decision) | B.4.3 tagged "[TRANSMITS] (polling still running until step 4)"; the D.9 tag note names only `mb poll on`, because `mb regs` only prints the cached model (no bus access). The orchestrator verified the edits |
+| P5 | Acceptance | **Task 008 accepted by the user, 2026-11-24.** Docs committed as `4be04e3` ("Add phase-1 probe checklist and measurement log template (task 008)"). The specs + wiki commit and the push follow (session fact) |
+| P6 | J2 / J7 wording closed | J2 "unplug USB at once" applies only to the B.6.b hard stop; J7 "first H line" = the first `H <t> <health>` console line after boot (rows J2, J7 above) |
+
+The S1–S9 amendment items of spec 008 are not listed individually in the session facts given to the wiki.
+
+Still open (unchanged): the 008 docs minors listed above (B.4.2 "started" line wording; `mb probe` asynchronous / `mb regs` after the last SWEEP; upper edge of the median 10 ms bucket and "answered = OK + EXC"; exact latency line text; 5 s boot window with USB power; C.5 "in D.3"); phase-2 DE re-check method (section 8); 011 minors m2–m7; 013 row A14.
+
+With 008 accepted, **all phase-1 tasks are done** (001, 009, 010, 012, 013, 014, 006, 011, 008). The probe image is built but not flashed; the next step is the user's bench run (section 7).
+
 ### Recorded conflict (D19)
 
 **Conflict (D19, recorded, not resolved):** the manual gives the address range 1–255 for reg 200 ([[concepts/device-addressing]], p4) while the Modbus spec reserves 248–255 *(external)*; the node accepts only 1..247. Also not stated: which port the address applies to, and "Address 001 – Leave free!" (p7) vs default 1 ([[concepts/device-addressing]]).
@@ -525,6 +591,10 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 
 **Update 2026-11-24, task 011 accepted, spec 008 approved (session facts, verified output, not in raw; user decision, session 2026-11-24):** the gap major is fixed (gap enforced in `fake_link` on every request, asserted at the end of every scenario, new e2e cases 11a/11b beyond spec 011); `build-verifier` re-check PASS (host 139 / 0 / 0, 0 warnings); `firmware-reviewer` re-review **APPROVE** with one new minor m7 (section 6 "Task 011 acceptance", G1–G6). **User accepted task 011 as is**; minors m2–m7 stay open; spec 011 not amended (11a/11b and the in-fake gap rule are recorded extra scope). Code committed as `17825cb`; push after the docs commit. **Task 011 done.** **Spec 008 approved by the user**; `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md`, then `firmware-reviewer`, then user acceptance. Then the user flashes the probe image (bench items) and runs the on-site probe.
 
+**Update 2026-11-24, 008 docs written and reviewed (session facts, verified output, not in raw; user decision, session 2026-11-24; not committed):** `firmware-dev` (sonnet) wrote the two docs; `firmware-reviewer` **APPROVE WITH MINORS** (major: no step tagged as transmitting). Architect findings H3–H5, including the code-vs-text conflict on the end-of-frame wait (about 20–30 ms, not 10–20 ms). The user applied the safety items J1–J5, D.3 rule J6, new stop J7 and timing figures J8; the other minors stay open (section 6 "Task 008 docs review decisions"). **Status: architect amends spec 008 and spec 014 rule 4** (in progress), then `firmware-dev` updates the docs, `firmware-reviewer` re-check, user acceptance, commit on request. *(Update 2026-11-24: done, update below.)*
+
+**Update 2026-11-24, task 008 accepted (session facts, verified output, not in raw; user decision, session 2026-11-24):** the architect amended spec 008 and spec 014 rule 4 and corrected the two leftover "10–20 ms" statements; `firmware-dev` updated the docs (S1–S9 applied, extra `[TRANSMITS]` tags); `firmware-reviewer` re-review **APPROVE WITH MINORS**; two minors fixed by user decision (B.4.3 tag, D.9 tag note) (section 6 "Task 008 acceptance", P1–P6). **User accepted task 008**; docs committed as `4be04e3`; the specs + wiki commit and the push follow. **Task 008 done. All phase-1 firmware and docs are complete** (001, 009, 010, 012, 013, 014, 006, 011, 008). The probe image is built, not flashed. Next: the user flashes it and runs checklist section B on the bench, then sections C/D on site.
+
 | Task | Change |
 |---|---|
 | 001 | modify: new Kconfig (UART port, RX/TX/DE GPIO, baud, slave address, timeouts, poll periods, `CONFIG_DMT_BUS_WRITE` = n); lint -> `check_bus_access.py`; host runner unchanged |
@@ -537,12 +607,12 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 | 005 | retire (RX-only listen survives as the silence check in `rs485_port`) |
 | 006 | modify: poll loop + probe console (`bus_task`, `mb` console, `app_main`; first flashable probe image). **Done, accepted 2026-11-24, committed and pushed as `b8ad00d`** (section 6 "Task 006 review decisions" T1–T7 and "Task 006 acceptance" V1–V5); `firmware-reviewer` APPROVE WITH MINORS, re-review APPROVE; not yet run on hardware |
 | 007 | retire, replaced by 011 |
-| 008 | modify: on-site probe checklist + log template, items 1–11 (section 1). **Spec finalised 2026-11-24** (Q-HW1/Q-HW2 applied, console texts aligned to `b8ad00d`, F1–F4 in section 6 "Spec 008 finalisation"); ~~awaiting user approval of the spec~~ **spec approved by the user 2026-11-24**; docs `docs/phase1-probe/checklist.md` and `measurement-log-template.md` **in progress** (`firmware-dev`, sonnet), then `firmware-reviewer` and user acceptance (section 6 "Spec 008 approval") |
+| 008 | modify: on-site probe checklist + log template, items 1–11 (section 1). **Spec finalised 2026-11-24** (Q-HW1/Q-HW2 applied, console texts aligned to `b8ad00d`, F1–F4 in section 6 "Spec 008 finalisation"); ~~awaiting user approval of the spec~~ **spec approved by the user 2026-11-24**; docs `docs/phase1-probe/checklist.md` and `measurement-log-template.md` **in progress** (`firmware-dev`, sonnet), then `firmware-reviewer` and user acceptance (section 6 "Spec 008 approval"). *2026-11-24: docs written; `firmware-reviewer` APPROVE WITH MINORS; safety items J1–J8 decided; spec 008 and 014 rule 4 being amended (end-of-frame wait about 20–30 ms, bound about `dur_ms` - 34 ms), then docs update and re-check (section 6 "Task 008 docs review decisions")*. **Done, accepted 2026-11-24, docs committed as `4be04e3`**; re-review APPROVE WITH MINORS; B.4.3/D.9 minors fixed; other docs minors open (section 6 "Task 008 acceptance") |
 | 009 | new: `daikin_regs` |
 | 010 | new: `reg_model` + `poll_sched` |
 | 011 | new: fake-slave host tests. **Implemented 2026-11-24, not yet verified** (`build-verifier` and `firmware-reviewer` running; update below). *2026-11-24: `build-verifier` PASS (137 / 0 / 0); `firmware-reviewer` REQUEST CHANGES (1 major: D16 gap coverage; 8 deviations accepted; minors m2–m6 open by user decision); major fix in progress, then re-check and user acceptance (section 6 "Task 011 review decisions")*. **Done, accepted as is 2026-11-24, committed as `17825cb`** (push after the docs commit); host 139 / 0 / 0; re-review APPROVE; minors m2–m7 open; 11a/11b and the in-fake gap rule are extra scope beyond spec 011, spec not amended (section 6 "Task 011 acceptance") |
 
-Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 (done, accepted 2026-11-24, pushed as `b8ad00d`) -> 008; 011 any time**. Next: 011, then 008. *(Update 2026-11-24: 011 implemented, verification running; 008 spec finalised, awaiting user approval.)* *(Update 2026-11-24: 011 review REQUEST CHANGES, major fix in progress, minors m2–m6 open.)* *(Update 2026-11-24: 011 done, accepted, committed `17825cb`; 008 spec approved, docs in progress. Next: 008 docs -> `firmware-reviewer` -> user acceptance -> commit; then flash the probe image, bench items, on-site probe.)* *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
+Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 (done, accepted 2026-11-24, pushed as `b8ad00d`) -> 008; 011 any time**. Next: 011, then 008. *(Update 2026-11-24: 011 implemented, verification running; 008 spec finalised, awaiting user approval.)* *(Update 2026-11-24: 011 review REQUEST CHANGES, major fix in progress, minors m2–m6 open.)* *(Update 2026-11-24: 011 done, accepted, committed `17825cb`; 008 spec approved, docs in progress. Next: 008 docs -> `firmware-reviewer` -> user acceptance -> commit; then flash the probe image, bench items, on-site probe.)* *(Update 2026-11-24: 008 docs reviewed (APPROVE WITH MINORS); next: architect amends specs 008 and 014 rule 4 -> `firmware-dev` updates the docs -> `firmware-reviewer` -> user acceptance -> commit; then flash, bench B, on-site C/D.)* *(Update 2026-11-24: 008 done, accepted, docs `4be04e3`. **Phase-1 firmware and docs complete**; next is the user's bench run (checklist section B), then on-site C/D, then the probe log into `raw/` and `/capture`, then phase-2 specs.)* *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
 
 ## 8. Open items and risks
 
@@ -552,9 +622,12 @@ Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committ
   **Decision (user decision, session 2026-11-24, not in raw):** **defer.** 008 B.6 "DE with concurrent flash/NVS activity" is "not done in phase 1, repeat at phase-2 bring-up". No test console command is added to the 006 image.
 - **Residual risk (new 2026-11-24, from the Q-HW1 / Q-HW2 answers):** DE timing stays **unmeasured in phase 1**, including the load-bearing assumption that the TX_DONE ISR runs from IRAM (`CONFIG_UART_ISR_IN_IRAM=y`, build guard M2, section 3; risk bullet below). Phase-1 evidence for DE and slave turnaround is limited to console counters and timestamps. Re-check DE timing (incl. under flash/NVS load) at phase-2 bring-up where possible; without a scope or logic analyser the method for that re-check is still open *(inferred; user decision, session 2026-11-24)*. Indirect phase-1 evidence (multimeter static and averaged DE level, complete OK replies + counters) is recorded but not counted as a pass (spec 008 finalised, section 6 "Spec 008 finalisation").
 - **Open question (before the phase-2 specs; user decision F4, session 2026-11-24):** how is DE timing (incl. under flash/NVS load) re-checked at phase-2 bring-up without a scope or logic analyser? Decide later.
-- **Hard stop (new 2026-11-24, 008 B.6.b, F3; user decision, session 2026-11-24):** a multimeter averaged DE level near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect.
+- **Hard stop (new 2026-11-24, 008 B.6.b, F3; user decision, session 2026-11-24):** a multimeter averaged DE level near 3.3 V during `mb probe` on the bench -> record and stop, back to the architect. Per J2 (clarified 2026-11-24), unplug USB at once; this "unplug at once" applies only to this hard stop.
 - **Note for turning the 008 probe log into a fixture (task 011 minor m5, open; session facts, not in raw; user decision, session 2026-11-24):** the fake slave holds at most `FAKE_REPLAY_MAX` = 512 replay entries; a real on-site 008 log may exceed this, and `fake_load_log` then returns -1. Replay keys on (addr, reg, qty) and ignores the request kind and `t_start`; the fixtures README does not say so yet. Check both before using the probe log as a replay fixture (section 6 "Task 011 review decisions").
-- **Open (wiki-keeper note):** the basis of the "about 25 ms" subtracted from `dur_ms` in F2 (section 6) is not in the session facts given to the wiki; ask the architect.
+- *(Closed 2026-11-24)* **Open (wiki-keeper note):** the basis of the "about 25 ms" subtracted from `dur_ms` in F2 (section 6) is not in the session facts given to the wiki; ask the architect. **Answer (session facts, verified output, not in raw):** request 8.33 ms + qty-1 reply 7.29 ms + an end-of-frame wait of at least 10 ms, minus 1 ms timestamp truncation, gives about 25 ms *(inferred)*. With the real wait of at least 20 ms the bound is about `dur_ms` - 34 ms (J8, section 6 "Task 008 docs review decisions").
+- **Hard stops and rules (new 2026-11-24, user decision, session 2026-11-24):** B.5 stops if `faults since boot` changes or a `# mb_link: ... failed` line appears (J3); `link counters: n/a` still shown after the first H line -> record and stop (J7; "first H line" = first `H <t> <health>` console line after boot, clarified 2026-11-24); D.3: OFFLINE before or during `mb probe` -> go to D.4, no further probing (J6).
+- **Risk (new 2026-11-24, architect finding H3):** a B.6.b DE reading during an OFFLINE or cancelled `mb probe` is a false pass, because the sweep is suspended while OFFLINE and cancelled by `mb poll off` / `mb silence` / `mb addr`. Mitigated by the procedure J2 (run from STOPPED, read during the sweep, no `mb poll off`) *(session facts, verified output, not in raw)*.
+- **Open minors of the 008 docs (excluded by the user, 2026-11-24; still open after the 008 acceptance):** listed in section 6 "Task 008 docs review decisions" and "Task 008 acceptance".
 - "Panel is slave" is inferred ([[entities/ekwhctrl1]]); if the silence check sees traffic or the panel never answers -> stop, back to the architect.
 - Starred registers may be unavailable (no water temperature, no STAT, no OUT) ([[concepts/register-map]]).
 - Not stated in the manual: port of the address, "Address 001 – leave free" vs default 1, timing, exception codes, write endurance, panel behaviour without polling (the 300 s timeout is probably irrelevant here, *inferred*, [[concepts/flag-registers]]).
@@ -567,12 +640,12 @@ Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committ
 - Whether the panel enforces 202/203/245/246 is unknown -> the node enforces them.
 - *(Closed 2026-11-24)* esp-modbus facts to verify in the task-002 spike *(external)*: DE signal, silent create/start, error granularity, internal retries, handling of addresses > 247. Answered by the spike *(project evidence)*; error granularity insufficient (S3) -> E2; DE = RTS (section 4).
 - **Risk (new 2026-11-24, E2):** own code now sits in the **TX path** (`mb_rtu` framing/CRC, `rs485_port` UART + DE handling) instead of a registry library; mitigation is review (`firmware-reviewer`, code-inspection checklists incl. the DE rules of section 4) and host tests of `mb_rtu` *(inferred)*.
-- **Risk (new 2026-11-24, E2; corrected same day):** the **inter-byte timing of the slave answering on "A A B B -"** (EKWHCTRL1, *inferred*, [[entities/ekwhctrl1]]) is unknown (not stated in the manual); the own frame-end detection depends on it, and with `CONFIG_FREERTOS_HZ` = 100 the end-of-frame silence window is 10–20 ms (known limit, user 2026-11-24). Checked on site by task 008 D.8a ("the answering slave", max inter-byte interval from `mb_link_get_counters`) *(inferred)*. *(Correction: the earlier text named the INN-FR-B32 reply; that was an orchestrator wording error, user/orchestrator 2026-11-24.)*
+- **Risk (new 2026-11-24, E2; corrected same day):** the **inter-byte timing of the slave answering on "A A B B -"** (EKWHCTRL1, *inferred*, [[entities/ekwhctrl1]]) is unknown (not stated in the manual); the own frame-end detection depends on it, and with `CONFIG_FREERTOS_HZ` = 100 the end-of-frame silence window is ~~10–20 ms~~ about 20–30 ms (known limit, user 2026-11-24; *amended 2026-11-24*, section 3 "Timing"). Checked on site by task 008 D.8a ("the answering slave", max inter-byte interval from `mb_link_get_counters`) *(inferred)*. *(Correction: the earlier text named the INN-FR-B32 reply; that was an orchestrator wording error, user/orchestrator 2026-11-24.)*
 - Fallback E1b (esp-modbus) remains available if E2 is too hard to debug on site; revert is a separate user decision (section 2).
 - **Risk (new 2026-11-24, task 014 review):** a flash or NVS stall (Matter activity) during our transmit can delay the DE release if the TX_DONE ISR is not in IRAM, and DE then stays high on the shared line. Mitigation: `CONFIG_UART_ISR_IN_IRAM=y` with build guard M2 (section 3); concurrent flash/NVS activity is one of the DE checks on site (task 008, section 6 "Task 014 review decisions") *(inferred mechanism; reviewer, project evidence)*.
 - **Risk (new 2026-11-24, task 014):** `gap_bytes` and `max_byte_interval_us` are approximate (M3). Quote them only as bounds in the probe log.
 - **Risk (new 2026-11-24, task 006; still open after acceptance):** the `bus_task` stack of 4 KB is not yet proven. Keep it as a to-verify risk: check on site with the stack high-water mark after boot and after `mb silence 1` (task 008 reviewer check, section 6 "Task 006 review decisions" T7); if the margin is too small, the stack size is a new user decision *(session facts, not in raw)*.
-- **Open (2026-11-24, after 006 acceptance):** the probe image has not run on hardware. *(Q-HW1 and Q-HW2 answered 2026-11-24, above. Update 2026-11-24: spec 008 finalised with these answers, awaiting user approval; section 6 "Spec 008 finalisation". Update 2026-11-24: spec 008 approved, docs in progress; section 6 "Spec 008 approval".)*
+- **Open (2026-11-24, after 006 acceptance):** the probe image has not run on hardware. *(Q-HW1 and Q-HW2 answered 2026-11-24, above. Update 2026-11-24: spec 008 finalised with these answers, awaiting user approval; section 6 "Spec 008 finalisation". Update 2026-11-24: spec 008 approved, docs in progress; section 6 "Spec 008 approval". Update 2026-11-24: docs written and reviewed, spec/docs amendments in progress; section 6 "Task 008 docs review decisions". Update 2026-11-24: task 008 accepted, docs `4be04e3`; phase-1 firmware and docs complete; the image is built, not flashed; next is the user's bench run, section 6 "Task 008 acceptance".)*
 - RMW race on 201 accepted.
 - How Matter ecosystems render the Fan endpoint *(external)*.
 - `CONFIG_UART_ISR_IN_IRAM`: resolved 2026-11-09, kept (section 6).

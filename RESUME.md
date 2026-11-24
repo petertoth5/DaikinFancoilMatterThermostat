@@ -6,16 +6,13 @@ Update after EVERY step. Keep short.
 Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, connecting to the Daikin EKWHCTRL1 **"A A B B -" Modbus RTU port** (nothing else connected there). Node = **sole Modbus master** (FC03 polling, FC06 only on Matter commands); staged phasing: 1 on-site read probe -> 2 Matter read-only mirror -> 3 Matter writes (write code compiled out until 3). User decisions 2026-11-08. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
 
 ## Last step (2026-11-24)
-- Task 011 gap major fixed (gap enforced in `fake_link` on every request, asserted per scenario; new e2e 11a/11b, extra scope beyond spec 011, spec not amended). `build-verifier` PASS (host 139/0/0, 0 warnings); `firmware-reviewer` re-review APPROVE (new minor m7: 11b loop has no iteration cap).
-- User accepted 011 as is; code committed as `17825cb` (push after the docs commit).
-- User approved spec 008; `firmware-dev` (sonnet) is writing `docs/phase1-probe/checklist.md` and `docs/phase1-probe/measurement-log-template.md`.
-- Wiki updated (firmware-architecture section 6 "Task 011 acceptance", full 8-deviation list, "Spec 008 approval"; sections 7/8; project-goal, index, log). Docs not committed.
+- Task 008 accepted by the user: specs 008 + 014 rule 4 amended (leftover "10–20 ms" texts corrected), docs updated (S1–S9, extra `[TRANSMITS]` tags), `firmware-reviewer` re-review APPROVE WITH MINORS, B.4.3/D.9 minors fixed. Docs committed as `4be04e3`.
+- Wiki updated (firmware-architecture section 6 "Task 008 acceptance", sections 7, 8; project-goal, index, log). J2/J7 wording questions closed.
+- Specs + wiki commit and push follow (`17825cb`, `4be04e3` not yet pushed).
 
 ## Status / gates
-- **Gate OPEN for phase 1.** Done, committed and pushed: 001, 009, 010, 012, 013 (+ follow-up `9ca4517`), 014 (`987fbd1`, docs `4752afd`), 006 (`b8ad00d`). Probe image builds; not flashed yet.
-- **011 done**, committed `17825cb` (not yet pushed; push after the docs commit).
-- **008 spec approved 2026-11-24; docs in progress** (`firmware-dev`), then `firmware-reviewer`.
-- Open: phase-2 DE re-check method without instrument (section 8, before phase-2 specs); basis of the "~25 ms" in F2 not recorded in wiki (ask architect); 011 minors m2–m7 (m5 matters when the 008 log becomes a fixture: `FAKE_REPLAY_MAX` 512, replay keys on addr/reg/qty); 013 doc minors (firmware-architecture section 6 row A14).
+- **All phase-1 tasks done:** 001, 009, 010, 012, 013, 014, 006, 011, 008. Probe image built, **not flashed**.
+- Open: phase-2 DE re-check method (firmware-architecture section 8, settle before phase-2 specs); 008 docs minors (section 6 "Task 008 docs review decisions"); 011 minors m2–m7 (m5 matters when the 008 log becomes a fixture); 013 doc minors (row A14).
 - To verify on site: `bus_task` 4 KB stack (high-water after boot and after `mb silence 1`).
 - Stage 2/3 specs only after the probe log is in `raw/` and captured.
 - Dev env: ESP-IDF v6.0.2 (`. ~/esp/esp-idf-v6.0.2/export.sh`); host target via `idf.py --preview set-target linux`; `libbsd-dev` user action pending (or `export CPATH="/home/szpikko/esp-host-stubs:$CPATH"`).
@@ -23,10 +20,10 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, co
 - Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrites them (`rtk` prefix); agents fall back to the Read tool.
 
 ## Next
-1. 008 docs (`firmware-dev`) -> `firmware-reviewer` -> user acceptance -> commit.
-2. Flash the probe image; bench items (DE/turnaround "not measured"; hard stop on averaged DE near 3.3 V during `mb probe`).
-3. On-site probe (`dur_ms` + derived bound; `bus_task` stack high-water).
-4. Probe log into `Knowledgebase/raw/`, then `/capture`; then `architect` writes phase-2 specs.
+1. User flashes the probe image and runs checklist section B (`docs/phase1-probe/checklist.md`) on the bench, recording into `measurement-log-template.md` (B.6.b hard stop: run from STOPPED, read during the sweep).
+2. On-site sections C/D (`dur_ms` + derived bound ~`dur_ms` - 34 ms; `bus_task` stack high-water).
+3. Probe log into `Knowledgebase/raw/`, then `/capture`.
+4. `architect` writes phase-2 specs; settle the phase-2 DE re-check method first.
 
 ## Start prompt (copy/paste into a fresh session in this repo; orchestrator is the default agent, else run `claude --agent orchestrator`)
 ```

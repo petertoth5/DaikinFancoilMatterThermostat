@@ -328,3 +328,28 @@ No raw files added or changed. Session facts (verified output, not in raw) and u
 - concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
 - Open: phase-2 DE re-check method (F4); basis of the "about 25 ms" (F2); 011 minors m2–m7; 013 row A14 doc minors.
 - Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 008 docs reviewed; end-of-frame wait corrected; user decisions J1–J8
+No raw files added or changed. Session facts (verified output, not in raw) and user decisions (session 2026-11-24, not in raw). Not committed.
+- `firmware-dev` (sonnet) wrote `docs/phase1-probe/checklist.md` and `measurement-log-template.md` (uncommitted; console strings cited to 006 file:line). `firmware-reviewer`: APPROVE WITH MINORS (major: no step tagged as transmitting); all deviations accepted.
+- Architect findings (orchestrator checked in code): `mb probe` suspended while OFFLINE (`poll_sched.c` rule 8) -> false-pass risk for B.6.b; `mb poll off`/`mb silence`/`mb addr` cancel a sweep; `link counters: n/a` returns early (no `faults since boot`).
+- Conflict recorded (code vs spec 014 rule 4 / spec 008 / wiki): end-of-frame wait is about 20–30 ms (`rs485_port.c:413`), not 10–20 ms. User: code stays, texts corrected. Wiki amended with struck-through history.
+- Turnaround bound derivation recorded (inferred): closes the "~25 ms basis" question; bound tightened to about `dur_ms` - 34 ms; sanity check OK qty-1 `dur_ms` >= about 36 ms.
+- User decisions J1–J8 (safety items only: transmit tags, B.6.b, B.5, D.2, C.4; D.3 rule; new stop on `link counters: n/a`; timing figures). Remaining docs minors open.
+- concepts/firmware-architecture: section 1 exit item 6 note; section 3 "Timing" amended; section 6 rows "Rejected extras", 008-b, 008-d, F2 and F2 status note amended, new subsection "Task 008 docs review decisions (user, 2026-11-24)" (H1–H5, conflict, derivation, J1–J8, open minors); section 7 new update paragraph, row 008, order line; section 8 "~25 ms" note closed, new hard-stop/rules, false-pass risk and open-minors bullets, frame-end risk amended, after-006 bullet updated.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
+- In progress: architect amends spec 008 and spec 014 rule 4; then docs update, re-review, user acceptance.
+- Open: wording "unplug USB at once" in J2 recorded as given (exact trigger not stated); "first H line" taken verbatim.
+- Not changed: `tasks/`, `firmware/`, `docs/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 008 accepted (docs `4be04e3`); phase-1 tasks complete
+No raw files added or changed. Session facts (verified output, not in raw) and user decisions (session 2026-11-24, not in raw). Not committed by the wiki-keeper.
+- `architect` amended spec 008 and spec 014 rule 4; the two leftover "10–20 ms" statements corrected (014 rule 4 earlier sentence -> "20 ms (2 ticks), measured from the last byte, up to one tick longer"; `tasks/README.md` line 34 -> "about 20–30 ms"); only "was 10–20 ms" history notes remain in `tasks/`.
+- `firmware-dev` updated `docs/phase1-probe/checklist.md` and `measurement-log-template.md` (S1–S9 applied; extra `[TRANSMITS]` tags: B.4.2, B.5.1 and B.11.1 "only if the 5 s window is missed", B.7, B.10, B.14.4, D.7).
+- `firmware-reviewer` re-review: APPROVE WITH MINORS (S1–S9 verified against the code, tags correct, nothing unsafe). User: two minors fixed (B.4.3 tag; D.9 tag note names only `mb poll on`); orchestrator verified.
+- User accepted task 008; docs committed as `4be04e3`. All phase-1 tasks done; probe image built, not flashed.
+- Closed: J2 "unplug USB at once" applies only to the B.6.b hard stop; J7 "first H line" = first `H <t> <health>` console line after boot.
+- concepts/firmware-architecture: section 6 rows J2/J7 clarified, conflict paragraph and status line annotated, new subsection "Task 008 acceptance" (P1–P6); section 7 new update paragraph, row 008, order line; section 8 B.6.b hard stop, J7 rule, open-minors bullet and after-006 bullet updated.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
+- Open (unchanged): 008 docs minors; phase-2 DE re-check method; 011 minors m2–m7; 013 row A14. New: S1–S9 items not listed individually in the session facts.
+- Not changed: `tasks/`, `firmware/`, `docs/`, `raw/`, `.claude/`.
