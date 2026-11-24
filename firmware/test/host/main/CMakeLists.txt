@@ -4,7 +4,7 @@ file(GLOB test_sources
     "${CMAKE_CURRENT_LIST_DIR}/../../../components/*/test_host/test_*.c")
 
 # Later tasks append their component to REQUIRES.
-idf_component_register(SRCS test_main.c ${test_sources}
+idf_component_register(SRCS test_main.c fake_slave.c ${test_sources}
                        REQUIRES unity daikin_regs reg_model poll_sched mb_rtu
                        WHOLE_ARCHIVE)  # keep TEST_CASE registrations from being dropped by the linker
 
