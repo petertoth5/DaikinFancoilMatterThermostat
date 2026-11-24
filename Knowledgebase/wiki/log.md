@@ -113,6 +113,9 @@ No raw files added or changed. Session implementation facts (verified build/test
 - MINOR follow-up applied same session (firmware-dev, haiku): overflow threshold changed to `>= 0x10000u` (`>=`, justified deviation from reviewer's suggestion); re-verified (build/host-tests/lint clean).
 - Nothing committed; nothing pushed. Working tree carries the edits.
 
+## [2026-11-24] sync | task 009 committed and pushed
+Two commits pushed to origin/main: firmware component + host REQUIRES edit; wiki + RESUME updates. Working tree clean (untracked `.vscode/` and `ProjectDefinitionPrompt.txt` intentionally not committed).
+
 ## [2026-11-09] sync | task 001 accepted, session end
 No raw files added or changed. Session implementation facts (verified build/test output, not in raw): task 001 implemented by `firmware-dev`, accepted 2026-11-09 after two review rounds (`firmware-reviewer` accepted, `build-verifier` all checks pass); committed in the session-end commit with the amended spec 001.
 - concepts/firmware-architecture section 7: 001 done, 009 next; open minor (self-test lacks explicit `^= -= *= /= %= >>=` cases).
