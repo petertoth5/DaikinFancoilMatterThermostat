@@ -5,7 +5,7 @@ file(GLOB test_sources
 
 # Later tasks append their component to REQUIRES.
 idf_component_register(SRCS test_main.c ${test_sources}
-                       REQUIRES unity
+                       REQUIRES unity daikin_regs
                        WHOLE_ARCHIVE)  # keep TEST_CASE registrations from being dropped by the linker
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)
