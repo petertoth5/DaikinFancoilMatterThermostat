@@ -1,6 +1,6 @@
 # 008 - Phase-1 on-site probe: checklist and measurement log template (document task)
 
-Phase: 1. Status: spec ready (v0.3, 2026-11-08; amended 2026-11-09: automatic polling start, normal USB power, user decisions). Depends on: 006 (command names), 002 (spike answers S5/S7/S10). May be drafted in parallel with 010/011; finalised after 006 and the 002 spike report.
+Phase: 1. Status: spec ready (v0.3, 2026-11-08; amended 2026-11-09: automatic polling start, normal USB power, user decisions). Depends on: 006 (command names), 014 (link behaviour and counters; amended 2026-11-24, user decision E2: was 002); the DE facts come from the 002 spike report `docs/spikes/002-esp-modbus.md` S5/S10. May be drafted in parallel with 010/011; finalised after 006 and 014.
 Review: **bus-touching** (it tells the user how to connect and transmit). `firmware-reviewer` reviews it independently against the wiki and the 006 command list.
 
 A **document for the user**, not firmware. The user performs it on site; the filled log goes to `Knowledgebase/raw/` and is the gate input for the phase-2/3 specs (D2, Q8).
@@ -32,8 +32,8 @@ A safety-first, step-by-step checklist to connect the probe node to the EKWHCTRL
 1. Wiring per architecture section 4: TX GPIO -> DI; RO -> level shift/divider -> RX GPIO (RO is a 5 V output unless U1 is a 3.3 V part, `entities/max485`); DE and /RE tied -> DE GPIO with 10 kOhm to GND (Q1, D8). Record the GPIOs; they must equal `CONFIG_DMT_BUS_TX_GPIO` / `RX_GPIO` / `DE_GPIO` (defaults 5/4/6 are placeholders). Record U1 marking and module supply.
 2. Unpowered module: A-B resistance; DE-/RE continuity; DE-GND = 10 kOhm.
 3. Flash the phase-1 image; record the git commit and that `build-verifier` reported lint and ELF check passed.
-4. Node powered, bus not connected: after about 5 s an `H ... ONLINE` line appears (automatic start), then `H ... DEGRADED` and, at the 5th failure, `H ... OFFLINE` (no slave). `mb status` shows boot silence activity 0, `write: compiled out`. Then `mb poll off` (`H ... STOPPED`) and measure the DE pin **low** (multimeter). If activity > 0 with A/B open, the receiver sees an unbiased floating line (bias resistors on the module unverified; this risk note user-approved 2026-11-09): record and stop; this goes back to the architect, not to a relaxed firmware setting.
-5. Abort-path check: reboot and type `mb poll off` within the first 5 s: `mb stats` shows 0 transactions and health STOPPED (A.6). Then `mb probe` (no slave): all TIMEOUT, health stays STOPPED. `mb silence 5` five times: passes each time, free heap in `mb status` stable (S10). DE pin low again afterwards.
+4. Node powered, bus not connected: after about 5 s an `H ... ONLINE` line appears (automatic start), then `H ... DEGRADED` and, at the 5th failure, `H ... OFFLINE` (no slave). `mb status` shows boot silence activity 0, `write: compiled out`. Then `mb poll off` (`H ... STOPPED`) and measure the DE pin **low** (multimeter). Without a slave every `T` line must be `TIMEOUT`, never `BADFRAME`, and `mb status` must show `gap_bytes 0`, `faults 0`: a `BADFRAME` here means bytes were received during or after our own transmission (RX line floating while /RE is high, 014 "RX line while transmitting"); record and stop, back to the architect (amended 2026-11-24, user decision E2). If activity > 0 with A/B open, the receiver sees an unbiased floating line (bias resistors on the module unverified; this risk note user-approved 2026-11-09): record and stop; this goes back to the architect, not to a relaxed firmware setting.
+5. Abort-path check: reboot and type `mb poll off` within the first 5 s: `mb stats` shows 0 transactions and health STOPPED (A.6). Then `mb probe` (no slave): all TIMEOUT, health stays STOPPED. `mb silence 5` five times: passes each time, free heap in `mb status` stable (UART driver delete/re-install cycle of 014; spike S10; amended 2026-11-24). DE pin low again afterwards.
 
 ### C. On site, mains off, node not connected
 1. Photo of both terminal blocks before any change.
@@ -50,7 +50,8 @@ A safety-first, step-by-step checklist to connect the probe node to the EKWHCTRL
 5. Multi-register test: `mb read 200 4`, `mb read 000 2`, `mb read 242 4` (item 5).
 6. Polling has run since D.2 (`mb poll on` only if it was stopped). Watch the panel display for anything new, e.g. a WEB icon (item 9, `concepts/web-restriction-flags` flag 0).
 7. Keypress correlation with logging on (default; `mb log on` only if it was switched off in D.3), each action with wall-clock time: setpoint up, setpoint down (231 vs 008), each fan mode (201 bits 0-2 order), season change (233 values 3/5), standby on/off (201 bit 7) (item 8).
-8. Soak >= 1 h of polling; `mb stats` at 1, 10, 60 min: >= 1000 transactions, latency min/median/max (item 6), error rate < 1 %, no OFFLINE entry; panel normal: display, icons, error codes, local keys (item 7).
+8. Soak >= 1 h of polling; `mb stats` at 1, 10, 60 min: >= 1000 transactions, latency min/median/max (item 6), error rate < 1 %, no OFFLINE entry; panel normal: display, icons, error codes, local keys (item 7). Note for item 6: the logged duration is the whole transaction (8-byte request, about 8 ms at 9600, plus the slave's reply time plus the end-of-frame silence wait of 10-20 ms with the default tick, 014), not the slave's pure response time.
+8a. Slave inter-byte timing (amended 2026-11-24, user decision; recorded with items 6 and 7, no new exit item): at 1, 10 and 60 min also note `mb status` `max_byte_interval_us`, `gap_bytes`, `faults`. One character lasts about 1042 us at 9600 8N1 (external); an interval well above about 2600 us (one character plus t1.5, external, approximate) means the answering slave pauses inside its replies. The node tolerates that (014 end-of-frame rule: silence never ends a frame before its expected length) but records it; `gap_bytes` > 0 means bytes arrived between transactions (late replies or foreign traffic). Resolution is limited by task wake-up latency (inferred, tens of us). Which device answers on "A A B B -" is the panel per the wiki (inferred, `entities/ekwhctrl1`); record what is observed, do not conclude more. If any `BADFRAME` lines appear, note their times next to these values.
 9. `mb poll off` for > 300 s (e.g. 10 min): watch panel and fancoil; `mb poll on`; `mb regs` for 105 bit 0 and, if readable, 104 bit 12 (item 10, `concepts/flag-registers`).
 10. `mb silence 60` with the panel connected: expected activity 0 (item 3, panel is a slave, inferred).
 11. `mb poll off`, unplug the node, mains off, disconnect the node, photo, mains on; confirm panel and fancoil work as before and that "+ A B -" was untouched.
@@ -63,8 +64,8 @@ A safety-first, step-by-step checklist to connect the probe node to the EKWHCTRL
 | 3 | Silence check saw no foreign traffic | D.2, D.10 | 1 |
 | 4 | Every documented register: OK + raw/scaled, exception + code, or timeout | D.3 | 4 |
 | 5 | FC03 qty > 1 works? | D.5 | 1b |
-| 6 | Response time min/median/max over >= 1000 transactions | D.8 | 2 |
-| 7 | >= 1 h polling, error rate < 1 %, no panel anomaly | D.8 | 2 |
+| 6 | Response time min/median/max over >= 1000 transactions (+ inter-byte interval, D.8a) | D.8, D.8a | 2 |
+| 7 | >= 1 h polling, error rate < 1 %, no panel anomaly (+ `gap_bytes`, `faults`, D.8a) | D.8, D.8a | 2 |
 | 8 | Keypress correlation 231/008, 201 bits 0-2, 233, 201 bit 7 | D.7 | - |
 | 9 | Panel shows anything when polled (e.g. WEB icon) | D.2, D.6 | - |
 | 10 | Panel behaviour when polling stops > 300 s and resumes | D.9 | 2 |
@@ -73,7 +74,7 @@ A safety-first, step-by-step checklist to connect the probe node to the EKWHCTRL
 State that the user personally verifies items 1, 2, 7, 8, 9, 10, 11 and that "+ A B -" was untouched (architecture section 1).
 
 ### Log template
-Header block (date, git commit, GPIOs, module U1/supply, address used, termination fitted y/n); one table or field per exit item and per measurement step, blank cells, units stated; panel-action table (time, action, registers changed, old -> new); "unexpected observations" free text. Last lines: "Save the filled log and the complete serial output to `Knowledgebase/raw/` (e.g. `raw/phase1-probe-<date>.md`, `raw/phase1-probe-<date>.log`) and ask `wiki-keeper` to run /capture. The `.log` can be copied to `firmware/test/fixtures/probe-<date>-capture.log` (011)."
+Header block (date, git commit, GPIOs, module U1/supply, address used, termination fitted y/n); one table or field per exit item and per measurement step, blank cells, units stated; panel-action table (time, action, registers changed, old -> new); link-counter table (time, `max_byte_interval_us`, `gap_bytes`, `faults`; D.8a and B.4, amended 2026-11-24); "unexpected observations" free text. Last lines: "Save the filled log and the complete serial output to `Knowledgebase/raw/` (e.g. `raw/phase1-probe-<date>.md`, `raw/phase1-probe-<date>.log`) and ask `wiki-keeper` to run /capture. The `.log` can be copied to `firmware/test/fixtures/probe-<date>-capture.log` (011)."
 
 ## Acceptance checks
 1. Every console command named exists in 006 with the same spelling and arguments.
@@ -83,7 +84,7 @@ Header block (date, git commit, GPIOs, module U1/supply, address used, terminati
 5. Plain language, numbered steps, tick boxes, no emojis.
 
 ## Test strategy
-Review only (`firmware-reviewer`, against the wiki, 006 and the 002 spike report); no code.
+Review only (`firmware-reviewer`, against the wiki, 006, 014 and the 002 spike report for the DE facts; amended 2026-11-24); no code.
 
 ## Recommended implementer model
 sonnet: safety-relevant document cross-checked against several wiki pages and the console spec; haiku risks dropping or overstating facts.

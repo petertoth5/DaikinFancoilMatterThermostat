@@ -83,7 +83,7 @@ typedef struct { ps_link_fn link; void *link_ctx; ps_clock_fn clock; void *clock
 /* true if a transaction was performed (*txn filled); false: nothing before *wait_until_ms (INT64_MAX = idle). */
 bool poll_step(poll_sched_t *s, reg_model_t *m, const ps_env_t *env, ps_txn_t *txn, int64_t *wait_until_ms);
 ```
-`ps_link_fn` has the semantics of `mb_link_read` (002); `bus_task` adapts it, 011 fakes it (seam user-approved 2026-11-09). `mb_link.h` stays the only hardware interface.
+`ps_link_fn` has the semantics of `mb_link_read` (014; was 002, pointer amended 2026-11-24, user decision E2, semantics unchanged); `bus_task` adapts it, 011 fakes it (seam user-approved 2026-11-09). `mb_link.h` stays the only hardware interface.
 
 Initial state: `poll_sched_init` leaves the scheduler STOPPED, so a failed boot silence check can latch before any request is possible. Polling after boot starts automatically (user decision 2026-11-09): `bus_task` (006) calls `poll_sched_start` right after a clean silence check and `mb_link_init`. This module has no auto-start of its own.
 
@@ -148,6 +148,6 @@ sonnet: a stateful scheduler with eleven interacting rules and a test per rule n
 Amendment follow-up (2026-11-24): sonnet. The code delta is small, but the address-mismatch rule, the RETRY finality check in `poll_step` and the soak-test fake (clock, latency, scripted outcomes) interact with existing rules; haiku is likely to miss an interaction.
 
 ## Out of scope
-- Any bus, UART, esp-modbus, FreeRTOS code (002, 006).
+- Any bus, UART, Modbus framing, FreeRTOS code (012, 014, 006; pointer amended 2026-11-24, user decision E2).
 - Matter null/stale policy (phase 2); writes, readback, debounce and caps (phase 3).
 - Automatic qty > 1 polling (only after exit item 5); re-tuning timeout to max(3 x observed max, 100 ms) (after the probe log).

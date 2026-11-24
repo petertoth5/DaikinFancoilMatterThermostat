@@ -3,6 +3,7 @@
 Phase: 1 (on-site read probe). Status: done (implemented and accepted 2026-11-09: firmware-reviewer accept after two rounds, build-verifier all checks pass). Depends on: nothing.
 Amended 2026-11-09 after review: `firmware-reviewer` found lint bypasses; the orchestrator approved the fixes (stricter than or clarifying v0.3): scanned suffixes, exact skip-directory names, R8 compound assignments, continuation splicing, documented lint limits, extra self-test cases, `firmware/.gitignore`, README notes.
 Review: `firmware-reviewer` reviews this task independently (the lint is a bus-safety control).
+Superseded in part (amended 2026-11-24, user decision E2: no esp-modbus): lint rules R1, R3, R4, R8, the self-test cases they flip and the ELF check are redefined by `013-lint-elf-check-no-esp-modbus.md`, which is granted ownership of `tools/check_bus_access.py` and the hook lines in `firmware/CMakeLists.txt`. The text below is the 001 state as implemented.
 
 ## Goal
 Turn the existing `firmware/` skeleton into the phase-1 layout every later task builds on:
@@ -115,4 +116,4 @@ sonnet: IDF CMake custom-target wiring, the linux host project and eight precise
 - The ELF check (002). CI. clang-tidy (report whether `esp-clang` is installed; do not install it).
 
 ## Follow-ups
-- `--self-test` lacks explicit cases for the R8 compound operators `^= -= *= /= %= >>=` (the lint already rejects them); add the cases in a later small change.
+- `--self-test` lacks explicit cases for the R8 compound operators `^= -= *= /= %= >>=` (the lint already rejects them); add the cases in a later small change. -> Scheduled in 013 (R8 (d), all ten operators; amended 2026-11-24).
