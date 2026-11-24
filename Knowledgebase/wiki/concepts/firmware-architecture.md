@@ -89,6 +89,8 @@ The manual states no timing, polling interval, response time or exception codes 
 - Reference: t3.5 ≈ 4.0 ms at 9600 baud with 11-bit characters *(external, Modbus serial-line spec)*.
 - **Gap bytes** (bytes received before a request, e.g. late replies or foreign traffic): counted in the `rs485_port` counters and discarded; the request is still sent (user, 2026-11-24).
 - `CONFIG_FREERTOS_HZ` stays at **100 Hz** (1000 Hz rejected, user, 2026-11-24); the resulting end-of-frame silence window of 10–20 ms is a known, accepted limit (user, 2026-11-24).
+- **`CONFIG_UART_ISR_IN_IRAM=y` is load-bearing for DE (user, 2026-11-24, `firmware-reviewer` on task 014):** DE is released in the UART TX_DONE ISR (section 4). If that ISR is not in IRAM, a flash or NVS stall (Matter activity) can delay the release and hold DE high after our request. Build guard M2 (`#error` if the option is off) and section 8 risk.
+- **Counters are approximate (user decision, 2026-11-24, M3):** `gap_bytes` is a lower bound and `max_byte_interval_us` is approximate. Do not quote them as exact values in the probe log (section 6 "Task 014 review decisions").
 - Response timeout 500 ms in P1; after the probe: max(3 × observed max, 100 ms).
 - Kconfig ranges as safety caps (user, 2026-11-09): gap 50–1000 ms, timeout 200–2000 ms, retries 0–1, fast period ≥ 2 s.
 
@@ -138,13 +140,13 @@ FC03 quantity 1 unless the probe proves qty > 1 works (probe item 5).
   - **ELF check behaviour after the follow-up (user decision 2026-11-24):** the check **fails** on empty `nm` output and when `app_main` is missing (a silent nm failure must not pass as "0 found").
   - Rule text as of the task 013 first pass: R1, R3, R4 and R8 rewritten for E2; R5 touched by the follow-up (**confirmed 2026-11-24:** the ten new UART setup names in R5 are allowed only in `components/rs485_port/`; `uart_flush_input` stays allowed). **Rule numbers as implemented (session facts, 2026-11-24, `build-verifier` and `firmware-reviewer`; not in raw):**
     - R3: esp-modbus headers, incl. comment, digraph and `#import` forms; manifests match `esp[-_]modbus`.
-    - R4: UART TX ban; `uart_write_bytes` only in `components/rs485_port/src/`; `uart_ll_*`, `uart_hal_*`, `esp_rom_uart_tx_one_char`, `uart_tx_one_char`, raw `UARTn.` register access and the `uart_struct.h` / `uart_ll.h` / `uart_hal.h` includes are banned everywhere, including `rs485_port`.
+    - R4: UART TX ban; `uart_write_bytes` only in `components/rs485_port/src/`; `uart_ll_*`, `uart_hal_*`, `esp_rom_uart_tx_one_char`, `uart_tx_one_char`, raw `UARTn.` register access and the `uart_struct.h` / `uart_ll.h` / `uart_hal.h` includes are banned everywhere, including `rs485_port`. Added by the 013 follow-up (commit `9ca4517`, section 6 rows A5–A8): `esp_rom_output_*`, `esp_rom_uart_*`, `esp_rom_install_*` (no blanket `esp_rom_*` ban), raw `UARTn.` / `UARTn->` access, `REG_WRITE` / `WRITE_PERI_REG` / `REG_READ` / `READ_PERI_REG` on `UART_FIFO*_REG` (bounded 200-character window, linear) and the `uart_reg.h` include, everywhere including `rs485_port`. Documented limits: section 6 rows A9–A14.
     - R5: UART setup calls, incl. the ten new names, only in `components/rs485_port/`; `uart_flush_input` allowed.
     - R8: function-code bytes only in `mb_rtu`, and only 0x03; `++` / `--` on function-code fields banned; deterministic comment regex.
     - Results: lint self-test 343 cases (0.24 s), tree scan rc 0; ELF self-test 32 cases, fails on empty `nm` output or missing `app_main` (`--nm /bin/true` gives exit 1); esp32s3 fresh build 0 warnings; ELF summary `forbidden 0 found; required: none configured`.
-    - Still open: the ROM/register TX routes are not banned yet (section 6, row A1).
+    - ROM/register TX routes (row A1): banned since commit `9ca4517` (section 6, rows A5–A8, A13). Open doc minors: section 6 row A14.
     - The exact rule text is in `firmware/tools/check_bus_access.py` and spec 013, not copied here.
-  - **Stricter UART rules and new bans (user decision 2026-11-24; applied by the 013 follow-up and accepted 2026-11-24, except the ROM/register routes of row A1, pending; exact rule ids as in the bullets above):** low-level TX paths (`uart_ll_*`, `uart_hal_*`, `esp_rom_uart_tx_one_char`, `uart_tx_one_char`, raw `UARTn.` register access, and their headers) and the UART setup calls `uart_set_hw_flow_ctrl`, `uart_set_baudrate`, `uart_set_parity`, `uart_set_word_length`, `uart_set_stop_bits`, `uart_set_tx_idle_num`, `uart_enable_tx_intr`, `uart_flush`, `uart_intr_config`, `uart_isr_register` are banned outside `components/rs485_port/`.
+  - **Stricter UART rules and new bans (user decision 2026-11-24; applied by the 013 follow-up (commit `9ca4517`) and accepted 2026-11-24, incl. the ROM/register routes of row A1; exact rule ids as in the bullets above):** low-level TX paths (`uart_ll_*`, `uart_hal_*`, `esp_rom_uart_tx_one_char`, `uart_tx_one_char`, raw `UARTn.` register access, and their headers) and the UART setup calls `uart_set_hw_flow_ctrl`, `uart_set_baudrate`, `uart_set_parity`, `uart_set_word_length`, `uart_set_stop_bits`, `uart_set_tx_idle_num`, `uart_enable_tx_intr`, `uart_flush`, `uart_intr_config`, `uart_isr_register` are banned outside `components/rs485_port/`.
   - The R1–R8 text below is the task 001 rule set; where it differs from the two bullets above, the bullets above apply *(inferred from the decisions; exact rule text is the architect's spec)*.
 - `tools/check_bus_access.py` (replaces the v0.2 zero-TX lint):
   - rules R1–R8 as specified in the approved spec `tasks/001-skeleton-kconfig-lint.md` ("Bus-access lint"); stricter than the v0.3 text where marked (user, 2026-11-09). Summary:
@@ -177,6 +179,7 @@ Mirrored Matter attributes without the NONVOLATILE flag; the esp_matter defaults
 - **Pin order (DE safety, user-approved 2026-11-24):** `uart_set_mode(UART_MODE_RS485_HALF_DUPLEX)` **first**, then `uart_set_pin` (TX, RX, DE as RTS). Reason: `sw_rts` resets to 0 (`IDF/soc/esp32s3/register/soc/uart_struct.h:517`) and the RTS pin follows its inverse, so routing RTS before the mode is set drives DE **high** in between *(project evidence, S5)*. The spec 002 interface comment had the reverse order (spike "Findings beyond S1-S12" point 2).
 - **DE re-drive after driver delete (DE safety, user-approved 2026-11-24):** `uart_driver_delete` -> `uart_release_pin` disables the RTS output (`uart.c:2116`); DE then floats and only the 10 kΩ pull-down holds it low until re-driven. `rs485_port` must write the DE GPIO level **0 before** `gpio_output_enable` (`IDF/esp_driver_gpio/src/gpio.c:228`) *(project evidence, S5)*.
 - Both DE rules are added to the code-inspection checklists (user, 2026-11-24).
+- **DE timing facts (task 014 review, `firmware-reviewer`, session 2026-11-24; project evidence from reading the local IDF v6.0.2 source, not verified on hardware):** DE is high only during our own request transmit (8 bytes). RTS is asserted before the TX FIFO is filled (`uart.c:1191`) and released in the TX_DONE ISR (`uart.c:1506`). Half-duplex mode sets `sw_rts` = 1, i.e. RTS low (`uart_ll.h:773-783`). The mode is set before the pins. DE is driven low before the output is enabled (`gpio.c:228-229`). After driver delete, DE floats on the 10 kΩ pull-down until re-driven. No reply byte is lost to the ISR RX-FIFO reset (`uart.c:1505`), because the receiver is off while DE is high. The DE release depends on the ISR, see section 3 (`CONFIG_UART_ISR_IN_IRAM`). On-board confirmation of DE for each transaction: task 008.
 - **GPIO (kept from v0.2):** RX/TX/DE GPIO via Kconfig, defaults are placeholders: TX 5 / RX 4 / DE 6 (user, 2026-11-09). Avoid 0/3/45/46 (strapping), 19/20 (USB), 26–37 (flash 26–32, octal PSRAM 33–37 on R8), 43/44 (UART0) *(external; exact reserved set unconfirmed, no module datasheet in raw, see [[entities/esp32-s3-wroom-1]])*.
 - **Termination (open):** measure A–B at the panel port (mains off, node disconnected). ≈ 120 Ω -> fit the user's separate 120 Ω at the node end; high/open -> start without and judge by the phase-1 error rate (a short 2-node run at 9600 has only minor reflections, *inferred*). Bias / fail-safe idle (module R5/R6/R8 unknown, [[sources/max485-module-photo]]) is assessed together with it. The MAX485 datasheet terminates both bus ends in the characteristic impedance ([[sources/max485-datasheet]] p13).
 
@@ -330,12 +333,64 @@ User decisions in the session of 2026-11-24, not in raw (user decision, session 
 
 | # | Topic | Decision |
 |---|---|---|
-| A1 | ROM / register TX routes | **Decided, NOT yet implemented** (user, 2026-11-24). Ban everywhere (R4): `esp_rom_output_tx_one_char`, `esp_rom_uart_putc` (pattern `esp_rom_(output\|uart)_\w*` for TX names), `UART[0-2]->` register access, `REG_WRITE` / `WRITE_PERI_REG` on `UART_FIFO\w*_REG`, and the `soc/uart_reg.h` include. To be implemented in a small lint follow-up before task 014 starts |
+| A1 | ROM / register TX routes | **Done** (user decision 2026-11-24; implemented in commit `9ca4517`, rows A5–A8). Ban everywhere (R4): `esp_rom_output_tx_one_char`, `esp_rom_uart_putc` (pattern `esp_rom_(output\|uart)_\w*` for TX names), `UART[0-2]->` register access, `REG_WRITE` / `WRITE_PERI_REG` on `UART_FIFO\w*_REG`, and the `soc/uart_reg.h` include. Implemented by the follow-up (row A5), before task 014 starts; verified, row A13 |
 | A2 | Acceptance of 013 | **Accepted "as is", 2026-11-24** (user). Host-test re-run was not done, see A4. Not committed (commit on request) |
-| A3 | Open minors (accepted as is) | (1) prefix `++a[b[1]].fc` with nested brackets not detected: document as a limit. (3) The docstring claim "matching is linear" is false for unterminated or repeated `/*` (contrived, ~40 s at 20000 repeats): correct the docstring or cap the gap length. (4) R5 `_second_argument` is quadratic on 3000 × `uart_set_mode(` (pre-existing): mention it. (5) The self-test 1.0 s per-case timing guard can fail on a loaded machine: consider 5 s. Caller's plan (2026-11-24): minors 1, 3, 4, 5 are fixed in the same lint follow-up as A1, before 014 |
-| A4 | Host-test re-run | **Not run** in the 013 `build-verifier` pass (blocked by the permission classifier). User accepted 013 without it: no C code changed in 013; `firmware-dev` reported 118 / 0 / 0. *(Suggestion, not a user decision: re-run host tests with the lint follow-up.)* |
+| A3 | Open minors (accepted as is) | (1) prefix `++a[b[1]].fc` with nested brackets not detected: document as a limit. (3) The docstring claim "matching is linear" is false for unterminated or repeated `/*` (contrived, ~40 s at 20000 repeats): correct the docstring or cap the gap length. (4) R5 `_second_argument` is quadratic on 3000 × `uart_set_mode(` (pre-existing): mention it. (5) The self-test 1.0 s per-case timing guard can fail on a loaded machine: consider 5 s. Caller's plan (2026-11-24): minors 1, 3, 4, 5 are fixed in the same lint follow-up as A1, before 014. **Status: done in `9ca4517`** (rows A9–A12) |
+| A4 | Host-test re-run | **Not run** in the 013 `build-verifier` pass (blocked by the permission classifier). User accepted 013 without it: no C code changed in 013; `firmware-dev` reported 118 / 0 / 0. **Closed** in the follow-up pass (row A13): fresh host build and run 118 / 0 / 0. |
+| A5 | 013 follow-up | **Done 2026-11-24** (user, session 2026-11-24, not in raw). Scope: the ROM/register TX ban (A1), extended by A6 and A7 (A8 limits the scope), and minors A9–A12. Implemented by `firmware-dev` (sonnet), committed and pushed as `9ca4517` (reported by the caller). Verified and accepted: row A13 |
+| A6 | Q-a: `esp_rom_install_*` | **Yes** (user, 2026-11-24). Also ban `esp_rom_install_*` (e.g. `esp_rom_install_uart_printf` can redirect output to a UART) |
+| A7 | Q-b: register reads | **Yes** (user, 2026-11-24). Also ban `REG_READ` / `READ_PERI_REG` on `UART_FIFO\w*_REG` |
+| A8 | Q-c: blanket ROM ban | **No** (user, 2026-11-24). No blanket `esp_rom_*` ban; only the names listed in A1, A6 |
+| A9 | Minor (1): nested brackets | Documented limit: the prefix `++a[b[1]].fc` (nested brackets) is not detected (A3 minor 1) |
+| A10 | Minor (3): docstring | The "matching is linear" docstring is corrected (A3 minor 3). **No cap** on the gap length (user, 2026-11-24) |
+| A11 | Minor (4): R5 helper | Documented: `_second_argument` is quadratic (3000 × `uart_set_mode(`) (A3 minor 4) |
+| A12 | Minor (5): timing guard | The self-test per-case timing guard goes from 1 s to **5 s** (A3 minor 5) |
+| A13 | Follow-up verified and accepted | **Accepted "as is", 2026-11-24** (user), commit `9ca4517` (committed and pushed, reported by the caller). `build-verifier` PASS: fresh esp32s3 build 0 warnings; lint self-test 372 cases (0.3 s); ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 Tests / 0 Failures / 0 Ignored (closes A4). `firmware-reviewer`: APPROVE WITH MINORS (200-character window acceptable). No blanket `esp_rom_*` ban (A8) |
+| A14 | Open doc minors (not fixed) | (a) the FIFO rule (A7) can be bypassed with a `;` inside a comment or string in the `REG_*` argument list: add to the documented limits. (b) R5 `_second_argument` on 5000 × `uart_set_mode(` takes more than 60 s (effectively a hang): state it in the limit text (A11). (c) optional self-test case for an unterminated `/*`. Not fixed; the lint code is unchanged by this step |
 
-Open for the caller: the `firmware-reviewer` bypass table (from the 013 review) is not in the wiki; the wiki copy is pending.
+Open for the caller: the `firmware-reviewer` bypass table (from the 013 review) is not in the wiki; the wiki copy is pending. Its remaining items are rows A14 (a)–(c).
+
+### Task 014 review decisions (user, 2026-11-24)
+
+User decisions in the session of 2026-11-24, not in raw (user decision, session 2026-11-24), taken after the task 014 implementation and the `firmware-reviewer` review (APPROVE WITH MINORS, section 7). The `architect` amended specs 014, 006 and 008; `firmware-dev` applies M1–M4 to 014. **Status 2026-11-24: M1–M4 done and re-checked; task 014 accepted 2026-11-24** (section 6 "Task 014 acceptance" below). The user approved the commit after the fix; committed and pushed as `987fbd1` (session facts 2026-11-24, not in raw).
+
+Fix now (task 014 minors, `rs485_port` + `mb_link`):
+
+| # | Topic | Decision |
+|---|---|---|
+| M1 | Interrupt flag | Pass the IRAM interrupt flag to `uart_driver_install`; this removes the IDF "flag updated" log line |
+| M2 | Build guard | `#error` if `CONFIG_UART_ISR_IN_IRAM` is off (section 3, DE) |
+| M3 | Counter semantics | Document `gap_bytes` as a **lower bound** and `max_byte_interval_us` as **approximate** (section 3). The reason is in the reviewer's minor text, not copied here |
+| M4 | Silence check | Reject a **0 ms** silence check |
+
+Spec 006 (amended by the architect; implemented later):
+
+| # | Topic | Decision |
+|---|---|---|
+| 006-a | IDF `uart` log | Mute the IDF `uart` log tag to WARN |
+| 006-b | Boot hold-receive | A failed hold-receive at boot is **fatal** |
+| 006-c | Read before silence check | **No read** before a clean silence check passes |
+
+Spec 008 (on-site, amended by the architect; section 8 and `tasks/008`):
+
+| # | Topic | Decision |
+|---|---|---|
+| 008-a | DE scope on site | Check DE at boot, at open, per transaction, with concurrent flash/NVS activity, at the silence check, and at close |
+| 008-b | Slave turnaround | Measure the slave turnaround on site |
+| 008-c | No slave | No answering slave gives **TIMEOUT** (checked on site) |
+| 008-d | End-of-frame wait | The **10–20 ms** end-of-frame wait is **accepted** (known limit, section 3) |
+
+### Task 014 acceptance (user, 2026-11-24)
+
+User decision in the session of 2026-11-24, not in raw (user decision, session 2026-11-24). Session facts from the M1–M4 fix are verified output, not in raw.
+
+| # | Topic | Decision |
+|---|---|---|
+| K1 | M1–M4 fixes | **Done** (session facts): M1 IRAM interrupt flag on both `uart_driver_install` calls (IDF "flag updated" log gone); M2 `#error` unless `CONFIG_UART_ISR_IN_IRAM` (guard proof: build with the option off fails with the `rs485_port` `#error`); M3 counter notes in `rs485_port.h` and `mb_link.h`; M4 silence check rejects 0 ms and NULL |
+| K2 | Verification | `build-verifier` PASS: fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a` built; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0 |
+| K3 | Re-review | `firmware-reviewer` re-review of the fix: **APPROVE** |
+| K4 | Acceptance | **Accepted 2026-11-24** (user). Committed and pushed as `987fbd1` ("Add rs485_port and mb_link FC03 read path over own RTU codec (task 014)") |
+| K5 | Not verified on hardware | The DE and ISR facts (rows in section 4) remain project evidence from the IDF source; on-board checks are in task 008 (open questions Q-HW1 / Q-HW2, section 8) |
 
 ### Recorded conflict (D19)
 
@@ -349,13 +404,21 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 
 **Update 2026-11-24, task 013 accepted (session facts, verified output, not in raw; not committed):** the task 013 follow-up (L1–L9, spec 013 amended by the architect, applied by `firmware-dev` on sonnet) was verified by `build-verifier` PASS (esp32s3 fresh build 0 warnings; lint self-test 343 cases in 0.24 s, tree scan rc 0; ELF self-test 32 cases, fails on empty `nm` output or missing `app_main`, `--nm /bin/true` exit 1; ELF summary `forbidden 0 found; required: none configured`). `firmware-reviewer` re-review: **APPROVE WITH MINORS**, all earlier findings closed. Not re-run: host tests (blocked by the permission classifier; no C code changed in 013; `firmware-dev` reported 118 / 0 / 0). **User accepted task 013 "as is" on 2026-11-24** (section 6 "Task 013 acceptance"). Open: ROM/register TX ban (row A1, decided, not implemented) and minors (A3). Next: the lint follow-up (A1 + minors), then 014, 006, 011, 008. The commit is pending the user's request.
 
+**Update 2026-11-24, 013 follow-up done and accepted (session facts, verified output, not in raw):** commit `9ca4517` ("Ban ROM and register UART TX routes in bus-access lint (013 follow-up)") is committed and pushed (reported by the caller; in local `git log`). `firmware-dev` (sonnet) implemented rows A5–A12: R4 bans (section 3), no blanket `esp_rom_*` ban, documented limits, 5 s timing guard; lint self-test 372 cases (0.3 s). `build-verifier` PASS: fresh esp32s3 build 0 warnings; ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0 (closes the host-run gap of 013). `firmware-reviewer`: APPROVE WITH MINORS (200-character window acceptable). **User accepted the follow-up as is, 2026-11-24** (section 6 row A13). Open doc minors, not fixed: section 6 row A14 (a)–(c). **Task 013 done.** **Task 014 started 2026-11-24:** `firmware-dev` (sonnet) implements `rs485_port` + `mb_link` (bus-touching, first TX code); next `build-verifier` and an independent `firmware-reviewer`; spec 014 escalation conditions are hard stops. Then 006, 011, 008.
+
+**Update 2026-11-24, 013 pushed; follow-up started (user decisions, session 2026-11-24, not in raw):** commits `fc5b50e` (013 lint/ELF check) and `19a3e94` (013 acceptance) are pushed (user-reported; both appear in the local `git log`). The ROM/register TX ban and the minors are in section 6 rows A5–A12 (Q-a yes, Q-b yes, Q-c no). The follow-up is handed to `firmware-dev` (sonnet). Next: `build-verifier` and `firmware-reviewer` on the follow-up, then accept; commit on request. Then 014, 006, 011, 008.
+
+**Update 2026-11-24, task 014 implemented and verified (session facts, verified output, not in raw; not committed):** `firmware-dev` (sonnet) implemented `rs485_port` + `mb_link` (own FC03 RTU master over the IDF UART in RS485 half-duplex, DE via RTS). No escalation condition of spec 014 was hit. `build-verifier` PASS: fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a` built; bus-access lint 372 and ELF self-tests 32; ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0; no dependency added. `firmware-reviewer`: **APPROVE WITH MINORS**. The reviewer verified the DE and ISR facts in the local IDF v6.0.2 source (section 4, project evidence) and found that no reply byte can be lost to the ISR RX-FIFO reset. The load-bearing point is `CONFIG_UART_ISR_IN_IRAM=y` (section 3). **User decisions (2026-11-24):** fix minors M1–M4 now, then re-check, accept and commit; 006 and 008 specs amended (section 6 "Task 014 review decisions"). **Status: M1–M4 in progress (`firmware-dev`), not yet re-checked.** Open: the reviewer's full minor text is not in the wiki (M3 reason).
+
+**Update 2026-11-24, task 014 accepted (session facts, verified output, not in raw; pushed as `987fbd1`):** the M1–M4 fixes (section 6 "Task 014 review decisions") were applied by `firmware-dev` (sonnet), re-checked by `build-verifier` (PASS, see section 6 "Task 014 acceptance", K2) and the `firmware-reviewer` re-review (APPROVE). **User accepted task 014 on 2026-11-24**; the firmware is committed and pushed as `987fbd1`. **Task 014 done.** Next: 006 (bus_task, probe console, `app_main`; firmware-dev sonnet, then build-verifier and firmware-reviewer), 011 (can run in parallel), then 008. Task 008 needs the user's answers to open questions Q-HW1 and Q-HW2 (section 8).
+
 | Task | Change |
 |---|---|
 | 001 | modify: new Kconfig (UART port, RX/TX/DE GPIO, baud, slave address, timeouts, poll periods, `CONFIG_DMT_BUS_WRITE` = n); lint -> `check_bus_access.py`; host runner unchanged |
 | 002 | **retired 2026-11-24** (note only; replaced by 012/013/014). Was: modify -> esp-modbus master spike + `mb_link` read path + `rs485_port` (CRC adapter dropped). Must establish: DE signal, silent create/start, error distinguishability incl. exception code, internal retries / t3.5, UART ownership and the order of `uart_set_pin` / `uart_set_mode`. **2026-11-24: stopped at S3; replaced by three tasks (pure `mb_rtu`; `rs485_port` + `mb_link` over UART; lint/ELF update), specs being written by the architect** |
 | 012 | new 2026-11-24, **done, accepted 2026-11-24** (not committed): pure `mb_rtu` (CRC16, FC03 builder, reply classifier), see the update above |
-| 013 | new 2026-11-24, **done, accepted "as is" 2026-11-24** (not committed): lint + ELF check without esp-modbus; L1–L9 applied (section 6); open: ROM/register TX ban (row A1) and minors (A3), in a lint follow-up before 014; compound-operator self-test minor closed |
-| 014 | new 2026-11-24, spec ready, **amended 2026-11-24** (session fact): reply-length adapter in `mb_link` (UNKNOWN or > `MB_RTU_MAX_REPLY_LEN` = "more"), rx buffer `MB_RTU_MAX_REPLY_LEN + 1` with write guard, acceptance 3k; `rs485_port` + `mb_link` read path over the IDF UART, counters |
+| 013 | new 2026-11-24, **done, accepted "as is" 2026-11-24**; commits `fc5b50e`, `19a3e94` and follow-up `9ca4517` pushed; follow-up done and accepted (section 6 rows A5–A13): lint + ELF check without esp-modbus; L1–L9 applied (section 6); ROM/register TX ban (row A1) and minors (A3) applied; open doc minors (a)–(c) in row A14; compound-operator self-test minor closed |
+| 014 | new 2026-11-24, **done, accepted 2026-11-24, committed and pushed as `987fbd1`** (section 6 "Task 014 review decisions" M1–M4 and "Task 014 acceptance"; `firmware-reviewer` APPROVE WITH MINORS, re-review APPROVE); spec amended 2026-11-24 (session fact): reply-length adapter in `mb_link` (UNKNOWN or > `MB_RTU_MAX_REPLY_LEN` = "more"), rx buffer `MB_RTU_MAX_REPLY_LEN + 1` with write guard, acceptance 3k; `rs485_port` + `mb_link` read path over the IDF UART, counters |
 | 003 | retire |
 | 004 | retire (ideas go into `reg_model` / `poll_sched`) |
 | 005 | retire (RX-only listen survives as the silence check in `rs485_port`) |
@@ -366,10 +429,12 @@ Status 2026-11-09 (architect specs, `tasks/README.md`): 001, 009, 010, 002, 006,
 | 010 | new: `reg_model` + `poll_sched` |
 | 011 | new: fake-slave host tests |
 
-Order (2026-11-24, user): 001, 009, 010, 012 and 013 (done; 013 accepted as is, not committed), then **lint follow-up (row A1 + minors) -> 014 -> 006 -> 008; 011 any time**. *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
+Order (2026-11-24, user): 001, 009, 010, 012, 013 and its follow-up (all committed and pushed, latest `9ca4517`), then **014 (done, accepted, pushed as `987fbd1`) -> 006 -> 008; 011 any time**. *(Was: 001, 009, 010, 002, 006, 011, 008; before the 013 acceptance: 013 -> 014 -> 006 -> 008.)*
 
 ## 8. Open items and risks
 
+- **Open question Q-HW1 (new 2026-11-24, for the user; answer before task 008 is finalised):** is an oscilloscope or logic analyser available on the bench or on site? Needed for `tasks/008` B.6 (DE level on a scope) and D.8b (slave turnaround). If not, these are logged as **"not measured"** in the probe log (session facts 2026-11-24, not in raw).
+- **Open question Q-HW2 (new 2026-11-24, for the user; answer before task 008 is finalised):** the phase-1 image cannot generate flash/NVS load, so the `tasks/008` B.6 run "DE with concurrent flash/NVS activity" is **not done in phase 1; repeat at phase-2 bring-up**, unless the user wants a test console command added to task 006 for it (user to decide; session facts 2026-11-24, not in raw).
 - "Panel is slave" is inferred ([[entities/ekwhctrl1]]); if the silence check sees traffic or the panel never answers -> stop, back to the architect.
 - Starred registers may be unavailable (no water temperature, no STAT, no OUT) ([[concepts/register-map]]).
 - Not stated in the manual: port of the address, "Address 001 – leave free" vs default 1, timing, exception codes, write endurance, panel behaviour without polling (the 300 s timeout is probably irrelevant here, *inferred*, [[concepts/flag-registers]]).
@@ -384,6 +449,8 @@ Order (2026-11-24, user): 001, 009, 010, 012 and 013 (done; 013 accepted as is, 
 - **Risk (new 2026-11-24, E2):** own code now sits in the **TX path** (`mb_rtu` framing/CRC, `rs485_port` UART + DE handling) instead of a registry library; mitigation is review (`firmware-reviewer`, code-inspection checklists incl. the DE rules of section 4) and host tests of `mb_rtu` *(inferred)*.
 - **Risk (new 2026-11-24, E2; corrected same day):** the **inter-byte timing of the slave answering on "A A B B -"** (EKWHCTRL1, *inferred*, [[entities/ekwhctrl1]]) is unknown (not stated in the manual); the own frame-end detection depends on it, and with `CONFIG_FREERTOS_HZ` = 100 the end-of-frame silence window is 10–20 ms (known limit, user 2026-11-24). Checked on site by task 008 D.8a ("the answering slave", max inter-byte interval from `mb_link_get_counters`) *(inferred)*. *(Correction: the earlier text named the INN-FR-B32 reply; that was an orchestrator wording error, user/orchestrator 2026-11-24.)*
 - Fallback E1b (esp-modbus) remains available if E2 is too hard to debug on site; revert is a separate user decision (section 2).
+- **Risk (new 2026-11-24, task 014 review):** a flash or NVS stall (Matter activity) during our transmit can delay the DE release if the TX_DONE ISR is not in IRAM, and DE then stays high on the shared line. Mitigation: `CONFIG_UART_ISR_IN_IRAM=y` with build guard M2 (section 3); concurrent flash/NVS activity is one of the DE checks on site (task 008, section 6 "Task 014 review decisions") *(inferred mechanism; reviewer, project evidence)*.
+- **Risk (new 2026-11-24, task 014):** `gap_bytes` and `max_byte_interval_us` are approximate (M3). Quote them only as bounds in the probe log.
 - RMW race on 201 accepted.
 - How Matter ecosystems render the Fan endpoint *(external)*.
 - `CONFIG_UART_ISR_IN_IRAM`: resolved 2026-11-09, kept (section 6).

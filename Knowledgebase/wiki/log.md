@@ -212,3 +212,44 @@ No raw files added or changed. User decisions (session 2026-11-24, not in raw) a
 - concepts/firmware-architecture: section 3 lint summary with rule numbers R3/R4/R5/R8 as implemented; section 6 new subsection "Task 013 acceptance" (rows A1–A4); section 7 update paragraph, table row 013 and order line.
 - concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture.
 - Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 013 pushed; follow-up decisions Q-a..Q-c
+No raw files added or changed. User decisions (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24). Git facts from the local `git log` (pushed status user-reported).
+- Pushed: `fc5b50e` (013 lint/ELF check) and `19a3e94` (013 acceptance).
+- 013 follow-up started, handed to `firmware-dev` (sonnet). Decisions: Q-a yes (also ban `esp_rom_install_*`, e.g. `esp_rom_install_uart_printf` can redirect output to a UART); Q-b yes (also ban `REG_READ` / `READ_PERI_REG` on `UART_FIFO*_REG`); Q-c no (no blanket `esp_rom_*` ban).
+- Minors in the same follow-up: document nested-bracket prefix `++` as a limit; correct the "linear" docstring (no cap on the gap); document the quadratic R5 helper; self-test timing guard 1 s -> 5 s.
+- Order: follow-up -> `build-verifier` + `firmware-reviewer` -> accept -> commit on request. Then 014, 006, 011, 008.
+- concepts/firmware-architecture: section 6 rows A1 (status), A5–A12 (new); section 7 update paragraph and 013 row. index.md summary for firmware-architecture.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`.
+
+## [2026-11-24] sync | 013 follow-up accepted, 014 started
+No raw files added or changed. User decisions (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24) and session facts (verified output, not in raw). Git facts from the local `git log` (`9ca4517` present); pushed status user-reported.
+- Pushed: `9ca4517` (Ban ROM and register UART TX routes in bus-access lint, 013 follow-up). Changed files: `firmware/tools/check_bus_access.py`, `firmware/README.md`.
+- Follow-up content (rows A5–A12): R4 also bans `esp_rom_output_*`, `esp_rom_uart_*`, `esp_rom_install_*` (no blanket `esp_rom_*` ban), raw `UARTn.` / `UARTn->` access, `REG_WRITE` / `WRITE_PERI_REG` / `REG_READ` / `READ_PERI_REG` on `UART_FIFO*_REG` (bounded 200-character window, linear) and the `uart_reg.h` include, everywhere including `rs485_port`; limits documented; self-test timing guard 5 s; lint self-test 372 cases (0.3 s).
+- `build-verifier` PASS: fresh esp32s3 build 0 warnings (self-tests 372 / 32); ELF `forbidden 0 found; required: none configured`; fresh host build and run 118 / 0 / 0 (closes the host-run gap of 013).
+- `firmware-reviewer`: APPROVE WITH MINORS (200-character window acceptable). User accepted the follow-up as is, 2026-11-24.
+- Open doc minors, not fixed (firmware-architecture section 6 row A14): (a) the FIFO rule can be bypassed with a `;` inside a comment or string in the `REG_*` argument list (add to limits); (b) R5 `_second_argument` on 5000 × `uart_set_mode(` takes more than 60 s (effectively a hang; state in limit text); (c) optional self-test case for an unterminated `/*`.
+- Task 014 (`rs485_port` + `mb_link`) handed to `firmware-dev` (sonnet), in progress. Bus-touching, first TX code. Next: `build-verifier` and independent `firmware-reviewer`; escalation conditions in spec 014 are hard stops.
+- concepts/firmware-architecture: section 3 R4 summary (follow-up bans) and ROM/register status; section 6 rows A1, A3, A4, A5 status and new rows A13, A14; section 7 update paragraph, rows 013 and 014, order line.
+- concepts/project-goal: tasks line rewritten (done and pushed: 001, 009, 010, 012, 013 + follow-up; 014 in progress; stale "not committed" text removed). index.md summaries for project-goal and firmware-architecture.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 014 review decisions
+No raw files added or changed. User decisions (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24) and session facts (verified output and `firmware-reviewer` reading of the local IDF v6.0.2 source, project evidence, not in raw; not committed).
+- Task 014 (`rs485_port` + `mb_link`, implemented by `firmware-dev` on sonnet): `build-verifier` PASS (fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a` built; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: none configured`; fresh host 118 / 0 / 0; no dependency added). No escalation condition hit. `firmware-reviewer`: APPROVE WITH MINORS.
+- Reviewer's DE and ISR facts (local IDF source, not hardware-verified): DE high only during our 8-byte transmit; RTS asserted before FIFO fill (`uart.c:1191`), released in TX_DONE ISR (`uart.c:1506`); half-duplex sets `sw_rts` = 1 (RTS low, `uart_ll.h:773-783`); mode before pins; DE low before output enable (`gpio.c:228-229`); driver delete floats DE on the 10 kΩ pull-down; no reply byte lost to ISR RX-FIFO reset (`uart.c:1505`). `CONFIG_UART_ISR_IN_IRAM=y` is load-bearing for the DE release.
+- User decisions on 014 minors: M1 IRAM interrupt flag on `uart_driver_install` (removes IDF "flag updated" log); M2 `#error` if `CONFIG_UART_ISR_IN_IRAM` is off; M3 document `gap_bytes` as lower bound and `max_byte_interval_us` as approximate; M4 reject 0 ms silence check. Fix now, then re-check, accept, commit (user approved the commit after the fix). `firmware-dev` applies M1–M4 (in progress).
+- User decisions on 006 (architect amended spec): mute IDF `uart` log to WARN; failed hold-receive at boot is fatal; no read before a clean silence check.
+- User decisions on 008 (architect amended spec): bench/site DE checks at boot, open, per transaction, with concurrent flash/NVS activity, at silence check and at close; measure slave turnaround; no answering slave gives TIMEOUT; 10–20 ms end-of-frame wait accepted.
+- concepts/firmware-architecture: section 3 (ISR-in-IRAM load-bearing, counters approximate); section 4 DE timing facts; section 6 new subsection "Task 014 review decisions (user, 2026-11-24)"; section 7 update paragraph and 014 row, order line; section 8 risks (flash/NVS stall vs DE release; counters approximate).
+- concepts/project-goal: tasks line (014 implemented and verified, M1–M4 pending). index.md summaries for project-goal and firmware-architecture.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | task 014 accepted
+No raw files added or changed. User decision (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24) and session facts (verified output and `firmware-reviewer` re-review, not in raw).
+- Task 014 M1–M4 fixes applied by `firmware-dev` (sonnet): M1 IRAM interrupt flag on both `uart_driver_install` calls; M2 `#error` unless `CONFIG_UART_ISR_IN_IRAM`; M3 counter notes in `rs485_port.h` and `mb_link.h`; M4 silence check rejects 0 ms and NULL. `build-verifier` PASS: fresh esp32s3 build 0 warnings; `librs485_port.a` and `libmb_link.a`; lint 372 and ELF 32 self-tests; ELF `forbidden 0 found; required: none configured`; guard proof (build with `CONFIG_UART_ISR_IN_IRAM` off fails with the `rs485_port` `#error`); fresh host 118 / 0 / 0. `firmware-reviewer` re-review: APPROVE.
+- User accepted task 014 on 2026-11-24. Firmware committed and pushed as `987fbd1` ("Add rs485_port and mb_link FC03 read path over own RTU codec (task 014)").
+- Open questions for the user, recorded (not answered), to be settled before task 008 is finalised: Q-HW1 (is an oscilloscope or logic analyser available on the bench or on site; needed for 008 B.6 and D.8b, otherwise "not measured") and Q-HW2 (the phase-1 image cannot generate flash/NVS load, so 008 B.6 "DE with concurrent flash/NVS activity" is "not done in phase 1, repeat at phase-2 bring-up", unless a test console command is added to 006).
+- concepts/firmware-architecture: section 6 status line of "Task 014 review decisions" updated; new subsection "Task 014 acceptance" (K1–K5); section 7 014 row, update paragraph and order line; section 8 new open questions Q-HW1 and Q-HW2; header unchanged.
+- concepts/project-goal: tasks line (014 done, next 006, 011, 008). index.md summaries for project-goal and firmware-architecture updated.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.

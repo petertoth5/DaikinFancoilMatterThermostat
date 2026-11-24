@@ -149,7 +149,14 @@ sonnet: regex determinism (proving no ambiguous nested quantifiers), many exactl
 - Phase-3 write rules.
 - The lint/ELF changes a revert to the E1b fallback would need (014 "Fallback E1b"; not implemented, separate user decision; amended 2026-11-24, user decision).
 
-## Open follow-up (decided, not implemented) (amended 2026-11-24, user decision)
+## Open follow-up (done, committed 9ca4517) (amended 2026-11-24, user decision)
+**Status (amended 2026-11-24, user decision): done (committed 9ca4517; accepted 2026-11-24 as is: build-verifier PASS, firmware-reviewer APPROVE WITH MINORS).** The user's answers to Q-a, Q-b, Q-c and to minors (1), (3), (4), (5) are recorded below; they are part of the decision, not open.
+
+**Open doc minors after commit 9ca4517 (amended 2026-11-24, user decision; documentation only):**
+- `;` inside a comment or string in a `REG_*` argument list bypasses the FIFO rule (document as a limit).
+- R5 helper: on thousands of repeated `uart_set_mode(` the scan takes minutes (state in the limit text; see minor (4) below).
+- Optional self-test case for an unterminated `/*` (see minor (3) below).
+
 Source: re-review of 013 after acceptance. Scope: one small lint pass (`firmware/tools/check_bus_access.py`, its docstring and the README lint section), by `firmware-dev` (sonnet: regex with exactly-one-rule cases and a timing guard), then build-verifier and firmware-reviewer. It runs **before 014 starts** (README row "013 follow-up (lint)").
 
 **Conflict check with 014 (architect, against the 014 text):** no conflict. 014 uses none of the new ban names (no `esp_rom_*`, no `UART[0-2]` access, no `REG_WRITE`/`WRITE_PERI_REG`, no `uart_reg.h`, `uart_struct.h`, `uart_ll.h`, `uart_hal.h`). Its `uart_write_bytes` in `components/rs485_port/src/` and its other driver calls (`uart_wait_tx_done`, `uart_get_buffered_data_len`, `uart_flush_input`, `uart_read_bytes`, `uart_set_rx_full_threshold`) are not touched by the new rules. The open minors below touch no 014 call either.
@@ -159,7 +166,8 @@ Source: re-review of 013 after acceptance. Scope: one small lint pass (`firmware
 |---|---|
 | ROM UART TX routes | `\besp_rom_(?:output\|uart)_\w*` (R4). Covers `esp_rom_output_tx_one_char` and `esp_rom_uart_putc`. The pattern is the whole family, deliberately wider than the TX names (no ROM UART call is needed by this project). The name `esp_rom_uart_tx_one_char` from 013 B is covered too. |
 | Pointer register access | `\bUART[0-2]\s*(?:\.\|->)` (R4 raw-register row extended by `->`; `UART_NUM_1`, `UART10` and `&UART1` stay as documented in A6). |
-| FIFO register writes | `\b(?:REG_WRITE\|WRITE_PERI_REG)\s*\([^;]*\bUART_FIFO\w*_REG\b`: a write macro whose argument list, up to the next `;`, names a `UART_FIFO*_REG` macro. Writes only; reads are open question Q-b. |
+| ROM install routes (Q-a, amended 2026-11-24, user decision: YES) | `\besp_rom_install_\w*` (R4). Covers `esp_rom_install_uart_printf` and the rest of the `esp_rom_install_*` family (the whole prefix, as for the row above). |
+| FIFO register access | `\b(?:REG_WRITE\|WRITE_PERI_REG\|REG_READ\|READ_PERI_REG)\s*\([^;]*\bUART_FIFO\w*_REG\b`: a read or write macro whose argument list, up to the next `;`, names a `UART_FIFO*_REG` macro. Reads added by Q-b (amended 2026-11-24, user decision: YES). |
 | Include | basename `uart_reg.h` (`soc/uart_reg.h`) added to the R4 include list, with `uart_struct.h`, `uart_ll.h`, `uart_hal.h`; same A1 include detection. |
 
 Self-test cases (each -> {R4} unless marked pass):
@@ -168,19 +176,20 @@ Self-test cases (each -> {R4} unless marked pass):
 - `WRITE_PERI_REG(UART_FIFO_REG(1), 0x41);` in `rs485_port.c`; `REG_WRITE(UART_FIFO_AHB_REG(1), 0x41);` in `main/main.c`.
 - `#include "soc/uart_reg.h"` in `rs485_port.c`; `#include <soc/uart_reg.h>` in `main/main.c`.
 - Pass: `esp_rom_delay_us(10);` in `main/main.c` (not in the family); `int n = UART_NUM_1;` in `main/main.c`.
-- No timing case for the FIFO-write rule: `[^;]*` is quadratic for many unterminated `REG_WRITE(` in one statement (same class as minor 4 below). The implementer may bound the gap instead and must report the choice.
+- (amended 2026-11-24, user decision Q-a/Q-b) `esp_rom_install_uart_printf(1);` in `main/main.c` -> {R4}; `REG_READ(UART_FIFO_AHB_REG(1));` in `components/rs485_port/src/rs485_port.c` -> {R4}. The pass case `esp_rom_delay_us(10);` above is the Q-a pass case. No case for Q-c (no blanket `esp_rom_*` ban).
+- No timing case for the FIFO-access rule (reads included, amended 2026-11-24): `[^;]*` is quadratic for many unterminated `REG_WRITE(` in one statement (same class as minor 4 below). The implementer may bound the gap instead and must report the choice.
 - Guard proof (acceptance 4 style, line comment so the compiler never sees it): `// REG_WRITE(UART_FIFO_REG(1), 0);` in `main/main.c` -> R4.
 
 ### Open minors (numbering as in the user's list; architect's recommendation; user to confirm)
-- **(1) Limit, document (A6 list, docstring and README):** `++`/`--` with nested brackets, e.g. `++a[b[1]].fc`, is not detected: the bracket gap `\[[^\]]*\]` does not nest. Recommendation: document; no fix in phase 1.
-- **(3) Docstring "matching is linear" is wrong.** An unterminated `/*` or repeated `/*` makes the comment-gap scan quadratic in the input length (A2 `_CMT`). Recommendation: correct the docstring to the measured behaviour, no behaviour change. Alternative (user choice): cap the comment-gap length, a rule change (a long comment between `fc` and `=` would then pass). Not chosen by the architect.
-- **(4) Pre-existing quadratic R5 `_second_argument` (001 code) on repeated `uart_set_mode(`.** Document it in the docstring and README limits. An optional timing case (`"uart_set_mode(" * 5000` in `rs485_port.c`) is allowed; its expected result must be derived from the current R5 logic and reported, not assumed.
-- **(5) Self-test timing guard 1.0 s -> 5 s (A2 cases).** Recommendation: raise to 5 s; it avoids flakes on a loaded WSL host. A quadratic or exponential regression still fails it, since such a case runs far longer than 5 s. The implementer reports the measured wall time of each A2 case so the user can check the margin.
+- **(1) Limit, document (A6 list, docstring and README):** `++`/`--` with nested brackets, e.g. `++a[b[1]].fc`, is not detected: the bracket gap `\[[^\]]*\]` does not nest. Recommendation: document; no fix in phase 1. **Decided 2026-11-24 (amended, user decision): document as recommended.**
+- **(3) Docstring "matching is linear" is wrong.** An unterminated `/*` or repeated `/*` makes the comment-gap scan quadratic in the input length (A2 `_CMT`). Recommendation: correct the docstring to the measured behaviour, no behaviour change. Alternative (user choice): cap the comment-gap length, a rule change (a long comment between `fc` and `=` would then pass). Not chosen by the architect. **Decided 2026-11-24 (amended, user decision): correct the docstring; no cap, no rule change.**
+- **(4) Pre-existing quadratic R5 `_second_argument` (001 code) on repeated `uart_set_mode(`.** Document it in the docstring and README limits. An optional timing case (`"uart_set_mode(" * 5000` in `rs485_port.c`) is allowed; its expected result must be derived from the current R5 logic and reported, not assumed. **Decided 2026-11-24 (amended, user decision): document as recommended; the optional timing case may be added, its expected result reported.**
+- **(5) Self-test timing guard 1.0 s -> 5 s (A2 cases).** Recommendation: raise to 5 s; it avoids flakes on a loaded WSL host. A quadratic or exponential regression still fails it, since such a case runs far longer than 5 s. The implementer reports the measured wall time of each A2 case so the user can check the margin. **Decided 2026-11-24 (amended, user decision): 5 s; this replaces the 1.0 s of the A2 timing guard.**
 
 ### Open questions (not adopted; the user decides, not part of this pass)
-- **Q-a (ROM install route):** `esp_rom_install_uart_printf()` (IDF v6.0.2 `components/esp_rom/include/esp_rom_sys.h:113`) and other `esp_rom_install_*` calls can route ROM output to a UART. They are outside `esp_rom_(output|uart)_\w*` and are not banned by this follow-up. Option: add `\besp_rom_install_\w*` to R4. Architect's recommendation: add it (same bus-safety argument; no project use).
-- **Q-b (FIFO reads):** `REG_READ`/`READ_PERI_REG` of a `UART_FIFO*_REG` would pull RX bytes around the driver. Not in the decided list; the architect recommends the same ban for reads.
-- **Q-c (other TX entry points):** `esp_rom_printf` and similar ROM print calls write to the console UART, not the bus UART; not in scope unless the user wants a blanket ban on `esp_rom_*` output calls.
+- **Q-a (ROM install route):** `esp_rom_install_uart_printf()` (IDF v6.0.2 `components/esp_rom/include/esp_rom_sys.h:113`) and other `esp_rom_install_*` calls can route ROM output to a UART. They are outside `esp_rom_(output|uart)_\w*` and are not banned by this follow-up. Option: add `\besp_rom_install_\w*` to R4. Architect's recommendation: add it (same bus-safety argument; no project use). **Decided 2026-11-24 (amended, user decision): YES.** Added to R4 (row above).
+- **Q-b (FIFO reads):** `REG_READ`/`READ_PERI_REG` of a `UART_FIFO*_REG` would pull RX bytes around the driver. Not in the decided list; the architect recommends the same ban for reads. **Decided 2026-11-24 (amended, user decision): YES.** Added to R4 (FIFO row above).
+- **Q-c (other TX entry points):** `esp_rom_printf` and similar ROM print calls write to the console UART, not the bus UART; not in scope unless the user wants a blanket ban on `esp_rom_*` output calls. **Decided 2026-11-24 (amended, user decision): NO.** No blanket `esp_rom_*` ban.
 
 ### Acceptance (follow-up pass)
 1. `python3 firmware/tools/check_bus_access.py --self-test` exits 0; report the case count before and after and the wall time of `time python3 firmware/tools/check_bus_access.py --self-test`; the A2 timing case times.
