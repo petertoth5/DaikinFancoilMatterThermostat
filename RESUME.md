@@ -8,7 +8,7 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, co
 ## Last step (2026-11-24)
 - Task 008 accepted by the user: specs 008 + 014 rule 4 amended (leftover "10–20 ms" texts corrected), docs updated (S1–S9, extra `[TRANSMITS]` tags), `firmware-reviewer` re-review APPROVE WITH MINORS, B.4.3/D.9 minors fixed. Docs committed as `4be04e3`.
 - Wiki updated (firmware-architecture section 6 "Task 008 acceptance", sections 7, 8; project-goal, index, log). J2/J7 wording questions closed.
-- Specs + wiki commit and push follow (`17825cb`, `4be04e3` not yet pushed).
+- Specs + wiki committed as `13b0591`; all pushed (`17825cb`, `537200e`, `4be04e3`, `13b0591`), `main` in sync with `origin/main`.
 
 ## Status / gates
 - **All phase-1 tasks done:** 001, 009, 010, 012, 013, 014, 006, 011, 008. Probe image built, **not flashed**.

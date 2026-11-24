@@ -353,3 +353,5 @@ No raw files added or changed. Session facts (verified output, not in raw) and u
 - concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture updated.
 - Open (unchanged): 008 docs minors; phase-2 DE re-check method; 011 minors m2–m7; 013 row A14. New: S1–S9 items not listed individually in the session facts.
 - Not changed: `tasks/`, `firmware/`, `docs/`, `raw/`, `.claude/`.
+
+## [2026-11-24] sync | task 008 specs + wiki committed as `13b0591` and pushed (`17825cb`, `537200e`, `4be04e3`, `13b0591`); `main` in sync with `origin/main`, no page changes
