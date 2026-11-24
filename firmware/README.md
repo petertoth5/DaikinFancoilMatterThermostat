@@ -22,7 +22,7 @@ are not exempt, backslash-newline continuations are spliced.
 | R1 | no esp-modbus master/controller API (`mbc_*`, `mbm_*`) anywhere |
 | R2 | no esp-modbus slave/TCP API (`mbc_slave_*`, `mbs_*`, `mbc_tcp_*`), no `esp_modbus_slave.h` |
 | R3 | no `esp_modbus_*.h` / `mbcontroller.h` include (`#` or `%:`, `include`/`include_next`/`import`, block comments allowed between the tokens); no line matching `esp[-_]modbus` (case-insensitive) in an `idf_component.yml` |
-| R4 | `uart_write_bytes*`, `uart_tx_chars`, `uart_set_rts/dtr/loop_back/line_inverse`, `_uart_set_pin*` banned; only the exact `uart_write_bytes` is allowed, in `components/rs485_port/src/`. Banned everywhere, also in `rs485_port/src/`: `uart_ll_*`, `uart_hal_*`, `esp_rom_uart_tx_one_char`, `uart_tx_one_char`, raw register access `UART0.`/`UART1.`/`UART2.`, includes of `uart_struct.h`, `uart_ll.h`, `uart_hal.h` (by basename) |
+| R4 | `uart_write_bytes*`, `uart_tx_chars`, `uart_set_rts/dtr/loop_back/line_inverse`, `_uart_set_pin*` banned; only the exact `uart_write_bytes` is allowed, in `components/rs485_port/src/`. Banned everywhere, also in `rs485_port/src/`: `uart_ll_*`, `uart_hal_*`, `uart_tx_one_char`, the ROM families `esp_rom_output_*`, `esp_rom_uart_*`, `esp_rom_install_*` (other `esp_rom_*` such as `esp_rom_delay_us` are allowed), raw register access `UART0.`/`UART1.`/`UART2.` and the pointer form `UART0->`, `REG_WRITE`/`WRITE_PERI_REG`/`REG_READ`/`READ_PERI_REG` whose arguments (within 200 characters, before the next `;`) name a `UART_FIFO*_REG`, includes of `uart_struct.h`, `uart_ll.h`, `uart_hal.h`, `uart_reg.h` (by basename) |
 | R5 | UART setup calls only in `components/rs485_port/` (`uart_set_pin`, `uart_set_mode`, `uart_driver_install/delete`, `uart_param_config`, `uart_read_bytes`, `uart_set_hw_flow_ctrl`, `uart_set_baudrate`, `uart_set_parity`, `uart_set_word_length`, `uart_set_stop_bits`, `uart_set_tx_idle_num`, `uart_enable_tx_intr`, `uart_flush` (not `uart_flush_input`), `uart_intr_config`, `uart_isr_register`); `uart_set_mode` only with `UART_MODE_RS485_HALF_DUPLEX` or `UART_MODE_UART` |
 | R6 | `CONFIG_DMT_BUS_TX_GPIO` / `CONFIG_DMT_BUS_DE_GPIO` only in `components/rs485_port/` and `main/` |
 | R7 | `mb_link_write*` only in `mb_link_write.c/.h` |
@@ -31,17 +31,21 @@ are not exempt, backslash-newline continuations are spliced.
 Documented limits (not detected): `#include MACRO`, `##` token pasting, decimal/octal/binary
 function-code literals, function codes computed at run time or passed through variables,
 aliases/pointers to an FC field, casts or dereference in a `++`/`--` operand (`++(*p).fc`,
-`++((T *)p)->fc`), arithmetic or bit operations on the FC constants inside `components/mb_rtu/src/`
+`++((T *)p)->fc`), nested brackets in a prefix operand (`++a[b[1]].fc`), arithmetic or bit operations on the FC constants inside `components/mb_rtu/src/`
 (`MB_RTU_FC_READ_HOLDING + 3`; trusted place, covered by review and host tests), character/string
 escapes (`'\x06'`, `'\006'`, `"\x06"`), `CMakeLists.txt`/`*.cmake`/`Kconfig*` files (e.g.
 `-DFC=0x06`), the count "exactly one `uart_write_bytes` call site" (014 inspection item 3e), raw
 UART access other than `UART0.`..`UART2.` (`&UART1`, `UART_LL_GET_HW(1)`, a `uart_dev_t *`) and
-transitive includes of the three banned UART headers, trigraph `??=include` (GCC ignores trigraphs
+transitive includes of the four banned UART headers, a `UART_FIFO*_REG` more than 200 characters
+after the `(` of the register macro or reached through another macro/variable, trigraph `??=include` (GCC ignores trigraphs
 in GNU modes, inferred). Known false positives (comments and strings are not exempt): a line comment
 ending in `--`/`++` directly before a line starting with an FC name (`// ----` then `fc = ...`) and
 prose such as `... UART1.` in a comment report R8 resp. R4; reword the comment. R8 is a heuristic;
-the real guard is that FC bytes exist only in `mb_rtu` plus the ELF check. The self-test also times
-every case (limit 1.0 s) so a regex that backtracks badly fails the build.
+the real guard is that FC bytes exist only in `mb_rtu` plus the ELF check. Matching time: no
+exponential backtracking; linear for closed comments, quadratic for an unterminated or many repeated
+`/*` (each rescans to the end of the input; no cap on comment length). The R5 `uart_set_mode`
+argument parser (001 code) is also quadratic on many repeated `uart_set_mode(` without `)`. The
+self-test also times every case (limit 5.0 s) so a regex that backtracks badly fails the build.
 
 `tools/check_elf_symbols.py --nm <nm> [--require SYM[,SYM...]] <elf>` runs after every link
 (`POST_BUILD` on the `.elf` target, `--nm ${CMAKE_NM}`, preceded by its `--self-test`). It fails

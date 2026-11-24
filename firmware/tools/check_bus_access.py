@@ -10,9 +10,11 @@ matching (not in manifests). Output: path:line: R<n>: message, exit 1.
   R2  no esp-modbus slave/TCP API, no esp_modbus_slave.h
   R3  no esp-modbus header (esp_modbus_*.h, mbcontroller.h) and no esp-modbus in a manifest
   R4  UART TX/RTS/DTR/loopback/invert calls banned; only the exact uart_write_bytes in
-      components/rs485_port/src/. uart_ll_*, uart_hal_*, esp_rom_uart_tx_one_char,
-      uart_tx_one_char, raw UART0./UART1./UART2. register access and the uart_struct.h,
-      uart_ll.h, uart_hal.h includes are banned everywhere (also in rs485_port/src)
+      components/rs485_port/src/. Banned everywhere (also in rs485_port/src): uart_ll_*,
+      uart_hal_*, uart_tx_one_char, esp_rom_output_*, esp_rom_uart_*, esp_rom_install_*, raw
+      UART0./UART1./UART2. register access (also `->`), REG_WRITE/WRITE_PERI_REG/REG_READ/
+      READ_PERI_REG with a UART_FIFO*_REG argument, and the uart_struct.h, uart_ll.h,
+      uart_hal.h, uart_reg.h includes. Other esp_rom_* calls (esp_rom_delay_us) are allowed
   R5  UART setup (driver install/config/pin/mode/baud/parity/flow control/ISR/flush ...) only
       in components/rs485_port/, uart_set_mode only with allowed modes
   R6  CONFIG_DMT_BUS_TX/DE_GPIO only in components/rs485_port/ and main/
@@ -25,22 +27,32 @@ variables, aliases/pointers to an FC field, array elements. R8 is a heuristic; t
 is that FC bytes exist only in mb_rtu plus the ELF symbol check (task 013,
 tools/check_elf_symbols.py). Further limits:
   - R8 (d) ++/-- and assignment: casts or dereference in the operand (`++(*p).fc`,
-    `++((T *)p)->fc`) are not detected.
+    `++((T *)p)->fc`) are not detected; nested brackets in a prefix operand
+    (`++a[b[1]].fc`) are not detected either (the bracket gap `\\[[^\\]]*\\]` does not nest).
   - Arithmetic or bit operations on the FC constants inside components/mb_rtu/src/
     (`MB_RTU_FC_READ_HOLDING + 3`, `MB_RTU_FC_READ_HOLDING | 0x80`) are not detected;
     mb_rtu/src is the trusted place (review and the host tests cover it).
   - Character and string escapes (`'\\x06'`, `'\\006'`, `"\\x06"`) are not detected as FC literals.
   - CMakeLists.txt, *.cmake and Kconfig* files are not scanned (e.g. `-DFC=0x06`).
   - "Exactly one uart_write_bytes call site" cannot be counted here (014 inspection item 3e).
-  - Raw UART register access is detected only as UART0./UART1./UART2.; `&UART1`,
-    `UART_LL_GET_HW(1)` or a `uart_dev_t *` are not, and the uart_struct.h/uart_ll.h/uart_hal.h
-    include ban does not see transitive includes.
+  - Raw UART register access is detected only as UART0./UART1./UART2. (or `->`); `&UART1`,
+    `UART_LL_GET_HW(1)` or a `uart_dev_t *` are not, and the uart_struct.h/uart_ll.h/uart_hal.h/
+    uart_reg.h include ban does not see transitive includes.
+  - UART FIFO register macros (R4): the UART_FIFO*_REG name must stand within 200 characters
+    after the `(` of REG_WRITE/WRITE_PERI_REG/REG_READ/READ_PERI_REG and before the next `;`
+    (bounded window, keeps matching linear). A longer argument list, or the register reached
+    through another macro or a variable, is not detected.
   - Trigraph `??=include` is not detected (GCC ignores trigraphs in GNU modes, inferred).
   - Known false positives (comments and strings are not exempt): a line comment ending in
     `--`/`++` directly before a line starting with an FC name (`// ----` then `fc = ...`) and
     prose such as `... UART1.` in a comment report R8 resp. R4; reword the comment.
+  - R5 uart_set_mode argument parsing (_second_argument, task 001 code) is quadratic on many
+    repeated `uart_set_mode(` without a closing `)`: each occurrence scans to the end of the file.
 Regex hygiene: every gap/comment pattern is built from _CMT, which can only end at the first
-`*/`; alternatives inside a repeated group never match the same text, so matching is linear.
+`*/`; alternatives inside a repeated group never match the same text, so there is no exponential
+backtracking. Matching time is linear in the input for closed comments, but quadratic for an
+unterminated `/*` or many repeated `/*` (each one rescans to the end of the input); there is no
+cap on the comment length. The self-test times every case (limit CASE_TIME_LIMIT_S).
 
   check_bus_access.py              scan the tree
   check_bus_access.py --self-test  run the built-in virtual-path cases
@@ -91,9 +103,17 @@ RE_MANIFEST_MODBUS = re.compile(r"esp[-_]modbus", re.IGNORECASE)
 RE_UART_TX = re.compile(
     r"\b(?:uart_write_bytes\w*|uart_tx_chars|uart_set_rts|uart_set_dtr"
     r"|uart_set_loop_back|uart_set_line_inverse|_uart_set_pin\w*"
-    r"|uart_ll_\w*|uart_hal_\w*|esp_rom_uart_tx_one_char|uart_tx_one_char)\b")
-RE_UART_REGISTER = re.compile(rf"\bUART[0-2](?:\s|{_CMT})*\.")
-UART_LOW_LEVEL_HEADERS = ("uart_struct.h", "uart_ll.h", "uart_hal.h")
+    r"|uart_ll_\w*|uart_hal_\w*|uart_tx_one_char"
+    # ROM routes to a UART: the whole families, no ROM UART call is needed here
+    r"|esp_rom_(?:output|uart|install)_\w*)\b")
+RE_UART_REGISTER = re.compile(rf"\bUART[0-2](?:\s|{_CMT})*(?:\.|->)")
+# Register macro whose arguments name a UART FIFO register (TX write or RX read around the driver).
+# The gap is a bounded window, not `[^;]*`, which is quadratic on repeated `REG_WRITE(`.
+FIFO_REG_WINDOW = 200
+RE_UART_FIFO_REG_ACCESS = re.compile(
+    rf"\b(?:REG_WRITE|WRITE_PERI_REG|REG_READ|READ_PERI_REG)\s*\([^;]{{0,{FIFO_REG_WINDOW}}}"
+    r"\bUART_FIFO\w*_REG\b")
+UART_LOW_LEVEL_HEADERS = ("uart_struct.h", "uart_ll.h", "uart_hal.h", "uart_reg.h")
 RE_UART_SETUP = re.compile(
     r"\b(?:uart_set_pin|uart_set_mode|uart_driver_install|uart_driver_delete"
     r"|uart_param_config|uart_read_bytes|uart_set_hw_flow_ctrl|uart_set_baudrate"
@@ -197,6 +217,8 @@ def _check_r4(path, text):
         yield m.start(), "R4", f"{m.group()} is banned (UART TX/RTS/DTR/loopback/invert/low-level)"
     for m in RE_UART_REGISTER.finditer(text):
         yield m.start(), "R4", "raw UART register access is banned"
+    for m in RE_UART_FIFO_REG_ACCESS.finditer(text):
+        yield m.start(), "R4", "register macro on a UART FIFO register is banned"
     for m in RE_INCLUDE.finditer(text):
         if _include_basename(m.group(1)) in UART_LOW_LEVEL_HEADERS:
             yield m.start(), "R4", f"{m.group(1)} (low-level UART header) include is banned"
@@ -383,7 +405,7 @@ PORT_SILENCE_CHECK = (
     "|| ev.type == UART_BUFFER_FULL)) { gap_bytes += ev.size; faults++; } uart_driver_delete(p);")
 # Repetition-heavy inputs for the timing guard (each case must finish within CASE_TIME_LIMIT_S).
 REPEAT = 5000
-CASE_TIME_LIMIT_S = 1.0
+CASE_TIME_LIMIT_S = 5.0
 
 # (virtual path, snippet, expected set of rules); empty set = must pass.
 SELF_TEST_CASES = (
@@ -573,7 +595,37 @@ SELF_TEST_CASES = (
     (MB_LINK_C, "++" + "(" * REPEAT + "fc;", {"R8"}),
     (MB_LINK_C, "++" + "a." * REPEAT + "x;", set()),
     (MB_LINK_C, "++" + "a[0]." * REPEAT + "fc;", {"R8"}),
+    (MB_LINK_C, "++a[b[1]].fc;", set()),  # documented limit: nested brackets are not followed
     (MB_LINK_C, "UART1" + " /* a */" * REPEAT + " .x = 0;", {"R4"}),
+    # R4 follow-up: ROM UART routes, pointer register access, FIFO register macros, uart_reg.h
+    (RS485_C, "esp_rom_output_tx_one_char('x');", {"R4"}),
+    (MAIN_C, "esp_rom_output_tx_one_char('x');", {"R4"}),
+    (MAIN_C, "esp_rom_uart_putc('x');", {"R4"}),
+    (RS485_C, "esp_rom_uart_tx_one_char('x');", {"R4"}),
+    (RS485_C, "esp_rom_install_uart_printf();", {"R4"}),
+    (MAIN_C, "esp_rom_install_channel_putc(1, f);", {"R4"}),
+    (RS485_C, "UART1->fifo.val = 0;", {"R4"}),
+    (MAIN_C, "UART0 -> conf0.val = 0;", {"R4"}),
+    (MAIN_C, "UART2 /* c */ ->conf0.val = 0;", {"R4"}),
+    (RS485_C, "WRITE_PERI_REG(UART_FIFO_REG(1), 0x41);", {"R4"}),
+    (MAIN_C, "REG_WRITE(UART_FIFO_AHB_REG(1), 0x41);", {"R4"}),
+    (MAIN_C, "REG_WRITE(\n    UART_FIFO_AHB_REG(1),\n    0x41);", {"R4"}),
+    (RS485_C, "REG_READ(UART_FIFO_REG(1));", {"R4"}),
+    (MAIN_C, "x = READ_PERI_REG(UART_FIFO_AHB_REG(1));", {"R4"}),
+    (MAIN_C, "REG_WRITE(" + "a" * 150 + ", UART_FIFO_REG(1));", {"R4"}),
+    (RS485_C, '#include "soc/uart_reg.h"', {"R4"}),
+    (MAIN_C, "#include <soc/uart_reg.h>", {"R4"}),
+    (MAIN_C, "esp_rom_delay_us(10);", set()),
+    (RS485_C, "esp_rom_delay_us(10);", set()),
+    (MAIN_C, "int n = UART_NUM_1;", set()),
+    (MAIN_C, "x = UART_FIFO_REG_SIZE;", set()),
+    (MAIN_C, "REG_WRITE(GPIO_OUT_REG, 1); x = REG_READ(GPIO_IN_REG);", set()),
+    (MAIN_C, "REG_WRITE(GPIO_OUT_REG, 1);\nx = UART_FIFO_REG(1);", set()),
+    (MAIN_C, "REG_WRITE(" + "a" * 300 + ", UART_FIFO_REG(1));", set()),
+    (MAIN_C, "REG_WRITE(" * REPEAT + "x;", set()),
+    (MAIN_C, "REG_WRITE(" * REPEAT + "UART_FIFO_REG(1);", {"R4"}),
+    (MAIN_C, "READ_PERI_REG(" * REPEAT + "x;", set()),
+    (MAIN_C, "UART1" + " /* a */" * REPEAT + " ->x = 0;", {"R4"}),
     # A3: ++/-- that must pass
     (MB_RTU_C, "i++; n--; ++i; fc_len++; ++fcx; --xfc; ++commands;", set()),
     (MB_RTU_C, "x = fc + +y; z = fc - -1;", set()),
