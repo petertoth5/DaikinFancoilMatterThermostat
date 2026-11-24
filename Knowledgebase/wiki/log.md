@@ -184,3 +184,31 @@ No raw files added or changed. Session facts (task 012 implementation and review
 - concepts/firmware-architecture: section 2 `mb_rtu` row; section 7 update paragraph, table rows 012/013/014, order line.
 - concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture.
 - Not changed: `tasks/` (spec 012/014 amendments and `tasks/README.md` are already modified in the working tree, edited by the architect; the README 012 status line may still read "spec ready").
+
+## [2026-11-24] sync | task 012 committed and pushed
+No raw files added or changed. Git facts (verified with `git log` / `git fetch` in this session, not in raw).
+- Pushed to origin/main: `568ec8a` (Add mb_rtu FC03 RTU frame codec with host tests, task 012; `firmware/components/mb_rtu/`, host REQUIRES in `firmware/test/host/main/CMakeLists.txt`) and `32709f7` (Record task 012 acceptance; bound reply length in spec 014; wiki section 7, project-goal, index, log, RESUME, `tasks/012`, `tasks/014`, `tasks/README.md`).
+- Task 013 (lint + ELF check without esp-modbus) handed to `firmware-dev` (sonnet); in progress. No 013 file changes were visible in the working tree when this entry was written.
+- RESUME.md updated: last step, status (origin/main = `32709f7`), next steps, start prompt unchanged.
+- Not changed: concepts/ and index.md (no content change in this step).
+
+## [2026-11-24] sync | task 013 review decisions
+No raw files added or changed. User decisions (session 2026-11-24, not in raw; cited as user decision, session 2026-11-24) and session facts (task 013 first pass, verified output, not in raw; not committed).
+- Task 013 first pass by `firmware-dev` (sonnet): R1/R3/R4/R8 rewritten for E2 (self-test 218 cases); `firmware/tools/check_elf_symbols.py` (24 self-test cases, stdlib only) as POST_BUILD hook on the ELF (`CMAKE_NM` = `xtensa-esp32s3-elf-nm`); `DMT_ELF_REQUIRED_SYMBOLS` empty until 006; esp-modbus gone from manifests, lock file and `managed_components`. `build-verifier` PASS (esp32s3 0 warnings; host 118/0/0; ELF `forbidden 0 found; required: none configured`). Five guard proofs failed the build as expected; the ELF guard proof needed `noinline` plus a side effect (an empty function was inlined away). `firmware-reviewer`: APPROVE WITH MINORS, bypass table (not copied; open).
+- User decisions L1–L9 (fix now): include detection (`#include`, `#import`, `%:include`, comments between `#` and the directive); deterministic comment regex; `++`/`--` banned on function-code fields; manifests match `esp[-_]modbus`; ELF check fails on empty nm output or missing `app_main`; stricter UART bans outside `components/rs485_port/` (low-level TX paths, `uart_set_*` setup calls, `uart_flush`, `uart_intr_config`, `uart_isr_register`, `uart_enable_tx_intr`); octal/binary literal bans not adopted; documented remaining limits; consequence for 014 (names `fc`/`func`/`command`, strings like `"fc=%d"` fail R8; FC hex constants decimal or named).
+- Order after the fix: spec 013 amendment (architect, running) -> 013 follow-up (`firmware-dev`) -> `build-verifier` + `firmware-reviewer` -> accept; commit on request. Then 014, 006, 011, 008.
+- concepts/firmware-architecture: section 3 lint summary (013 status, ELF behaviour, stricter UART bans); section 6 new subsection "Task 013 review decisions (user, 2026-11-24)" L1–L9; section 7 update paragraph and 013 row (compound-operator minor closed by 013).
+- index.md summaries for firmware-architecture and project-goal; concepts/project-goal tasks line updated (013 status).
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`.
+
+## [2026-11-24] sync | task 013 accepted
+No raw files added or changed. User decisions (session 2026-11-24, not in raw) and session facts (verified output, not in raw; not committed).
+- Task 013 follow-up (L1–L9, spec 013 amended by the architect, applied by `firmware-dev` on sonnet) verified by `build-verifier` PASS: esp32s3 fresh build 0 warnings; lint self-test 343 cases (0.24 s), tree scan rc 0; ELF self-test 32 cases, fails on empty `nm` output and missing `app_main` (`--nm /bin/true` exit 1); ELF summary `forbidden 0 found; required: none configured`. `firmware-reviewer` re-review: APPROVE WITH MINORS, all earlier findings closed.
+- Host-test re-run NOT done (blocked by the permission classifier). User accepted 013 without it: no C code changed in 013; `firmware-dev` reported 118 / 0 / 0.
+- User accepted task 013 "as is" on 2026-11-24.
+- Decided, NOT yet implemented: ban the remaining ROM/register UART TX routes everywhere (R4): `esp_rom_output_tx_one_char`, `esp_rom_uart_putc` (pattern `esp_rom_(output|uart)_\w*` for TX names), `UART[0-2]->`, `REG_WRITE` / `WRITE_PERI_REG` on `UART_FIFO\w*_REG`, `soc/uart_reg.h` include. Lint follow-up before task 014.
+- Open minors accepted as is for the acceptance: (1) prefix `++a[b[1]].fc` with nested brackets not detected (document); (3) docstring claim "matching is linear" false for unterminated/repeated `/*` (correct docstring or cap gap); (4) R5 `_second_argument` quadratic on 3000 × `uart_set_mode(` (pre-existing, mention); (5) self-test 1.0 s per-case timing guard may fail on a loaded machine (consider 5 s). Caller's plan: minors 1, 3, 4, 5 go into the same lint follow-up as the ROM/register ban.
+- Earlier inference "R5 touched by the follow-up" confirmed correct (ten new UART setup names only in `components/rs485_port/`).
+- concepts/firmware-architecture: section 3 lint summary with rule numbers R3/R4/R5/R8 as implemented; section 6 new subsection "Task 013 acceptance" (rows A1–A4); section 7 update paragraph, table row 013 and order line.
+- concepts/project-goal: tasks line. index.md summaries for project-goal and firmware-architecture.
+- Not changed: `tasks/`, `firmware/`, `raw/`, `.claude/`. Not committed.
