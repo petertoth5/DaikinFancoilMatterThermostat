@@ -106,6 +106,13 @@ No raw files added or changed. User answers (session 2026-11-09, not in raw) plu
 - index.md summary for firmware-architecture.
 - The 2026-11-09 note about `tasks/README.md` rule 3 (polling off after boot) is fixed by the architect (checked by wiki-keeper: rule 3 now says polling starts automatically after a clean boot check).
 
+## [2026-11-24] sync | task 009 accepted
+No raw files added or changed. Session implementation facts (verified build/test output, not in raw).
+- Task 009 `daikin_regs` implemented by `firmware-dev` (sonnet) as a pure C99 component (`firmware/components/daikin_regs/`, 32-row table + write_mask, host tests in `test_host/`, added to host REQUIRES); accepted by `firmware-reviewer` (APPROVE, 1 MINOR on overflow-check precision) and `build-verifier` (target 0 warnings; 26/26 host tests; lint self-test + scan clean).
+- Two pre-existing skeleton bugs from task 001 found and fixed in-session: wrong bounds-macro struct ordering (every row's bounds were bogus) and a uint16 overflow-check bug in `daikin_regs_read_allowed`; test expected table corrected independently.
+- MINOR follow-up applied same session (firmware-dev, haiku): overflow threshold changed to `>= 0x10000u` (`>=`, justified deviation from reviewer's suggestion); re-verified (build/host-tests/lint clean).
+- Nothing committed; nothing pushed. Working tree carries the edits.
+
 ## [2026-11-09] sync | task 001 accepted, session end
 No raw files added or changed. Session implementation facts (verified build/test output, not in raw): task 001 implemented by `firmware-dev`, accepted 2026-11-09 after two review rounds (`firmware-reviewer` accepted, `build-verifier` all checks pass); committed in the session-end commit with the amended spec 001.
 - concepts/firmware-architecture section 7: 001 done, 009 next; open minor (self-test lacks explicit `^= -= *= /= %= >>=` cases).
