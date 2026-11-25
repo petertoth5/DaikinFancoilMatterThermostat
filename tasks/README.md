@@ -37,6 +37,16 @@ Escalations that stop the pipeline (user decision): 014 DE/RTS deviations (RTS n
 ## Seam rule (normative; amended 2026-11-24, user decision)
 `mb_link.h` and its result semantics are the single seam of the link layer. Nothing above `mb_link` (`bus_task`, `main`, later Matter code) may include `mb_rtu.h` or `rs485_port.h` or depend on their types, constants or behaviour; `mb_link.h` declares its own config and counter types. Checked by grep in 014 (3i) and 006 (acceptance 2). This keeps an E1b revert confined to `components/mb_link/src/` plus the lint/ELF/build-config items listed in 014.
 
+## Phase 2a (bus-independent Matter part; plan approved by the user 2026-11-24)
+Gate amendment (user decision 2026-11-24, wiki architecture sec. 6 "Working mode and gate"): phase 2a may start before the probe log; phase 2b (real bus mapping) and phase 3 still wait for it. Separate IDF project `firmware/matter/`, no bus code; phase-1 files unchanged. `build-verifier` after each task; one `firmware-reviewer` review after 016 (S3).
+
+| # | Task | Depends on | Model | Bus-touching | Status |
+|---|---|---|---|---|---|
+| 015 | [Matter skeleton: project, partitions, BLE commissioning, static EP1, bus guard](015-matter-skeleton.md) | phase 1 done | sonnet | no (guard only) | spec ready |
+| 016 | [Simulated register model + provisional read-only mapping, bridge, `sim` console](016-sim-model-readonly-mapping.md) | 015 | sonnet | no | spec ready |
+
+Order: 015 (step 0 is a stop condition: esp_matter from the registry only) -> 016 -> feature review.
+
 ## Retired (files kept as short notes so numbering and history stay clear)
 - 002 esp-modbus master spike / `mb_link` (2026-11-24, user decision E2 on escalation S3) -> replaced by 012 (`mb_rtu`), 013 (lint + ELF check), 014 (`rs485_port` + `mb_link`); spike evidence in `docs/spikes/002-esp-modbus.md`; the esp-modbus route survives only as the documented fallback E1b in 014 (amended 2026-11-24, user decision)
 - 003 `rtu_sniff` (v0.3, 2026-11-08) -> was replaced by 002, now by 012/014
