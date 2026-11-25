@@ -1,0 +1,32 @@
+# Phase 2a Matter skeleton (task 015). Kconfig names from IDF v6.0.2 and esp_matter 1.6.1 / CHIP sources.
+CONFIG_IDF_TARGET="esp32s3"
+
+# N16R8 module (inferred): 16 MB flash, 8 MB octal PSRAM.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Console on UART0, as in the phase-1 image.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+# BLE (NimBLE) commissioning plus Wi-Fi station; no Thread.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_ESP_MATTER_ENABLE_OPENTHREAD=n
+CONFIG_ENABLE_WIFI_STATION=y
+
+# Test identity: VID 0xFFF1 / PID 0x8000 and the built-in example DAC provider.
+CONFIG_DEVICE_VENDOR_ID=0xFFF1
+CONFIG_DEVICE_PRODUCT_ID=0x8000
+CONFIG_EXAMPLE_DAC_PROVIDER=y
+
+# Matter needs more than the default main task stack and a 1 kHz tick.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=5120
+CONFIG_FREERTOS_HZ=1000
+
+# Matter uses the IDF mDNS component and IPv6 link-local autoconfiguration.
+CONFIG_USE_MINIMAL_MDNS=n
+CONFIG_LWIP_IPV6_AUTOCONFIG=y

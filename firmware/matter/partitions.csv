@@ -1,0 +1,6 @@
+# Name,   Type, SubType, Offset,   Size,     Flags
+# Matter keeps fabrics, counters and the KVS in "nvs"; the built-in test DAC needs no fctry partition.
+# No OTA partitions (out of scope for phase 2a).
+nvs,      data, nvs,     0x9000,   0xC000,
+phy_init, data, phy,     0x15000,  0x1000,
+factory,  app,  factory, 0x20000,  0x400000,
