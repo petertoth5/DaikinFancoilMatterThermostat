@@ -44,6 +44,7 @@ Gate amendment (user decision 2026-11-24, wiki architecture sec. 6 "Working mode
 |---|---|---|---|---|---|
 | 015 | [Matter skeleton: project, partitions, BLE commissioning, static EP1, bus guard](015-matter-skeleton.md) | phase 1 done | sonnet | no (guard only) | spec ready |
 | 016 | [Simulated register model + provisional read-only mapping, bridge, `sim` console](016-sim-model-readonly-mapping.md) | 015 | sonnet | no | spec ready |
+| 017 | [Station-only Wi-Fi: force STA before `esp_matter::start`, no SoftAP](017-disable-softap.md) | 015, 016 | sonnet | no | approved by user 2026-11-25 (re-analysis requested); implement if fix unchanged. Re-analysed 2026-11-25: root cause corrected (driver default mode after `esp_wifi_init` with empty NVS, promoted to STA+AP by CHIP `EnableStationMode`; not old NVS); fix unchanged, guard log lines now name the mode in all cases; alternative C rejected by the user |
 
 Order: 015 (step 0 is a stop condition: esp_matter from the registry only) -> 016 -> feature review.
 

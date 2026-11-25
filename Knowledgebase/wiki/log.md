@@ -398,3 +398,10 @@ No raw files added or changed. Session facts (orchestrator + independent agents,
 
 ## [2026-11-25] sync | task 016 commit ids
 No raw files added or changed. Session facts (local git, not in raw): task 016 code committed and pushed as `03dacf5`, wiki/RESUME record as `2f932e7`. concepts/firmware-architecture section 7: 016 row and phase-2a line now carry the commit id; index.md summary updated. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | phase-2a first on-device run; softAP finding; controller/flash setup
+No raw files added or changed. Sources: bench observation 2026-11-25 (user-run, board logs read by the orchestrator; not in raw), user setup statements.
+- concepts/firmware-architecture section 7: rows 015/016 on-device status; new "Phase-2a on-device run" (hardware confirmed; D1–D5, O1–O6, O8, O9 pass; O9 idle 64 s only; D4 IM status code unverified; D6, D7 Apple Home, O7 pending; softAP finding). Section 8: softAP finding open (spec 017 awaiting approval), on-device remainder list, N16R8 item closed.
+- concepts/dev-environment: "Flashing from WSL2" (usbipd-win, CH343 `/dev/ttyACM0`, erase-flash); controllers table: python-matter-server Container Manager setup, Android commissioning path, ASUS RT-AC88U IPv6 / roaming assistant / AP isolation fix; open questions 1 and 4 closed.
+- entities/esp32-s3-wroom-1: confirmed chip/flash/PSRAM/console facts from the boot log.
+- index.md: summaries of dev-environment, firmware-architecture, esp32-s3-wroom-1. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.

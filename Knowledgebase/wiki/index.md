@@ -12,12 +12,12 @@ Catalog of all wiki pages. Maintained by the agent; see root `CLAUDE.md`.
 ## Concepts
 - [project-goal](concepts/project-goal.md) — Matter-over-Wi-Fi thermostat scope; v0.3 approved 2026-11-08; phase 1 complete (probe image built, not flashed); phase-2a plan approved 2026-11-24 (separate Matter project, EP1 read-only on a simulated model), phase 2b after the probe log; working mode S1–S5
 - [bus-topology](concepts/bus-topology.md) — node <-> EKWHCTRL1 "A A B B -" point-to-point, node sole master, nothing else connected (user 2026-11-08); EKWHCTRL1 slave (inferred); phase-1 test questions; v0.3 firmware plan pointer (D1 hard rule, gate exception)
-- [dev-environment](concepts/dev-environment.md) — ESP-IDF + component-registry-only rule, host state, approved components (esp_matter ^1.6.1; esp-modbus removed 2026-11-24, E2; own project code compliant with registry-only rule); host-target facts; ELF-check scope; Matter controllers (chip-tool, HA Core + python-matter-server, Apple Home; SmartThings later)
+- [dev-environment](concepts/dev-environment.md) — ESP-IDF + component-registry-only rule, host state, approved components (esp_matter ^1.6.1; esp-modbus removed 2026-11-24, E2; own project code compliant with registry-only rule); host-target facts; ELF-check scope; Matter controllers (chip-tool, HA Core + python-matter-server, Apple Home; SmartThings later); python-matter-server NAS setup, router IPv6/roaming fix, WSL2 flashing via usbipd-win (2026-11-25)
 - [modbus-rs485-link](concepts/modbus-rs485-link.md) — 9600 8N1, FC 03/06 (port not named), cable/120 Ω rules ambiguous as to port, EKRTCTRL1 +AB-/+BA- legend conflict
 - [register-map](concepts/register-map.md) — full register table, star list (INN-FR-B32 only) checked, 230/234 star inconsistency, quirks
 - [flag-registers](concepts/flag-registers.md) — PRG, OUT, STAT, ALR_STAT bit tables (visually verified), label conflicts; 300 s timeout probably not about "A A B B -"
 - [web-restriction-flags](concepts/web-restriction-flags.md) — reg 247 supervisor flags, persistence (FLAG 7 cleared), FLAG 1 "247.0" typo, troubleshooting
-- [firmware-architecture](concepts/firmware-architecture.md) — v0.3: sole master on "A A B B -", phases (1 probe, 2a/2b mirror, 3 writes), components, E2 own FC03 RTU master, bus-safety and lint rules, wiring/DE, Matter mapping, all decisions (D1–D22, S1–S5, phase-2a plan 2a-1..10 (2a-10 NVS persistence), stage-1, U, E, L/A, M, T, F/J, task 011) as compact rows, task status table (015 `9dbace6`, 016 `03dacf5`, both committed), 015/016 verified facts, open items/risks
+- [firmware-architecture](concepts/firmware-architecture.md) — v0.3: sole master on "A A B B -", phases (1 probe, 2a/2b mirror, 3 writes), components, E2 own FC03 RTU master, bus-safety and lint rules, wiring/DE, Matter mapping, all decisions (D1–D22, S1–S5, phase-2a plan 2a-1..10 (2a-10 NVS persistence), stage-1, U, E, L/A, M, T, F/J, task 011) as compact rows, task status table (015 `9dbace6`, 016 `03dacf5`, both committed), 015/016 verified facts, first on-device run 2026-11-25 (D1–D5, O1–O6, O8, O9 pass; softAP finding, fix spec 017 pending), open items/risks
 - [firmware-history](concepts/firmware-history.md) — progress diary split off firmware-architecture 2026-11-24 (S2): header addenda, full task review/acceptance subsections, verification output, section 7/8 full text, superseded lint/D7 texts, superseded v0.2 table
 - [device-addressing](concepts/device-addressing.md) — address 1–255 (reg 200), keypad [+]/[—] procedure, "leave 001 free"; port not stated
 
@@ -26,5 +26,5 @@ Catalog of all wiki pages. Maintained by the agent; see root `CLAUDE.md`.
 - [ekwhctrl1](entities/ekwhctrl1.md) — wall control: "+ A B -" = fancoil link, "A A B B -" = Modbus RTU port (6-way block shared with CP); port facts, slave inferred; node taps "A A B B -"
 - [ekwhctrl0](entities/ekwhctrl0.md) — kit installed with EKWHCTRL1
 - [inn-fr-b32](entities/inn-fr-b32.md) — fancoil control PCB (N540022B in figures) with the "+AB-" Modbus terminal
-- [esp32-s3-wroom-1](entities/esp32-s3-wroom-1.md) — target MCU module
+- [esp32-s3-wroom-1](entities/esp32-s3-wroom-1.md) — target MCU module; 16 MB flash / 8 MB octal PSRAM confirmed by boot log 2026-11-25
 - [max485](entities/max485.md) — RS485 breakout module + chip facts, termination/level-shift concerns
