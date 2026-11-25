@@ -411,3 +411,9 @@ No raw files added or changed. Sources: session facts (build-verifier, review, l
 - concepts/firmware-architecture section 7: row 017 (done, `6b10c93`, spec + wiki `225bf37`, 2 optional log-text minors); phase-2a line; "Task 017 on device" (warning on first boot, `mode : sta`, network gone, HA reconnected; root cause H2, `ESP32Utils.cpp:116-120`); conflict recorded: `esp_wifi.h:382` "default mode is station" vs observed STA+AP after init.
 - Section 8: softAP item closed; on-device list now D6 + 017 D5, D7 Apple Home, O7/D4 status code, O9 idle 2 min, O3 timing, reset-task stack, NVS free space.
 - index.md: firmware-architecture summary. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | BOM document outside the wiki
+No raw files added or changed; no wiki pages changed. User request: wrote `docs/BOM.md` (checklist BOM for bench, on-site phase-1 probe, Matter controllers, final deployment) from entities/ekwhctrl1, entities/max485, entities/esp32-s3-wroom-1, concepts/bus-topology, concepts/firmware-architecture sections 4/7/8, concepts/dev-environment and `docs/phase1-probe/checklist.md`. Items not decided in the wiki (node power for deployment, isolation, enclosure, bus cable, mounting, bias) listed as open questions. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | session end, RESUME next-step order
+No raw files or wiki pages changed. RESUME.md "Next" reordered per user (phase-1 bench B first, then on-site/probe log, later on-device items, open deployment decisions). Not changed: `raw/`, `firmware/`, `tasks/`.

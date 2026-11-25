@@ -7,6 +7,7 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, co
 
 ## Last step (2026-11-25)
 - Task 017 (force STA-only Wi-Fi before `esp_matter::start`) done: build-verified, reviewed (0 blocker/major, 2 optional log-text minors left), pushed `6b10c93` (spec + wiki `225bf37`). On device: first boot warned `STA+AP, forcing STA`, then `mode : sta`, softAP gone, HA reconnected without re-pairing. Root cause H2 (driver reports STA+AP after init; conflicts with `esp_wifi.h` "default station", recorded in wiki). Wiki section 7/8 updated.
+- `docs/BOM.md` written (user request 2026-11-25): bench, on-site probe, controllers, final deployment; open hardware decisions (node power, isolation, enclosure, cable, mounting, bias) marked "to decide". Committed with this session's final commit.
 ## Working mode (user decisions S1–S5, 2026-11-24)
 - S1: wiki updated once per task, at acceptance (decisions and verified facts only); step progress goes to this file and git. Update this file after every step.
 - S2: keep the wiki slim (done 2026-11-24: diary in `concepts/firmware-history.md`).
@@ -22,9 +23,10 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout, co
 - Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrite; fall back to the Read tool.
 
 ## Next
-1. Later on device (user): D6 factory reset + 017 D5, Apple Home (D7), chip-tool O7 + D4 IM status code, O9 idle 2 min, O3 timing, reset-task stack, NVS free space.
-2. Phase-1 bench checklist section B (`docs/phase1-probe/checklist.md`), then on-site C/D.
-3. Probe log -> `Knowledgebase/raw/` + `/capture` -> phase 2b.
+1. Phase-1 bench run, checklist section B (`docs/phase1-probe/checklist.md`; parts in `docs/BOM.md`). Before flashing: `build-verifier` confirms which commit the phase-1 image in `firmware/build` is built from (the checklist header names `b8ad00d`, but phase-1 code changed later in tasks 011/008/014) and rebuilds if stale; the user states whether the MAX485 module runs at 5 V or 3.3 V (decides the RO→RX divider). Then step-by-step B.1–B.15 with the user. Flashing phase 1 replaces the Matter image; re-flashing Matter without erase keeps the HA pairing.
+2. On site C/D -> probe log -> `Knowledgebase/raw/` + `/capture` -> phase 2b (also settles provisional 233/STAT, standby/limit gaps, bus timing).
+3. Later on device (user, ~30 min, board only): Apple Home (D7), chip-tool O7 + D4 IM status code, O9 idle 2 min, O3 timing, reset-task stack, NVS free space; factory reset D6 + 017 D5 last (re-pair HA after).
+4. Deployment decisions open (BOM "to decide"): node power, isolation, enclosure, cable, mounting, bias, termination.
 
 ## Start prompt (copy/paste into a fresh session in this repo; orchestrator is the default agent, else run `claude --agent orchestrator`)
 ```
