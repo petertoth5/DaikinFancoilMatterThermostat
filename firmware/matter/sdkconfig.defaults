@@ -30,3 +30,7 @@ CONFIG_FREERTOS_HZ=1000
 # Matter uses the IDF mDNS component and IPv6 link-local autoconfiguration.
 CONFIG_USE_MINIMAL_MDNS=n
 CONFIG_LWIP_IPV6_AUTOCONFIG=y
+
+# Deferred NVS persistence of the 3 NONVOLATILE Thermostat attributes (task 016): one write per 60 s at most.
+# Value is passed as Milliseconds16, so it must stay <= 65535.
+CONFIG_ESP_MATTER_DEFERRED_ATTR_PERSISTENCE_TIME_MS=60000

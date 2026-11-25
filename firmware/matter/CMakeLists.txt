@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
-# Only the two pure phase-1 components; no bus code is built into this image (task 015).
-set(EXTRA_COMPONENT_DIRS ../components/daikin_regs ../components/reg_model)
+# Only the two pure phase-1 components plus the phase-2a components; no bus code is built into this image (task 015).
+set(EXTRA_COMPONENT_DIRS ../components/daikin_regs ../components/reg_model components)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(daikin_matter_skeleton)

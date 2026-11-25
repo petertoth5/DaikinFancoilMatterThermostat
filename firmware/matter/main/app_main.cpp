@@ -3,7 +3,9 @@
 #include <nvs_flash.h>
 #include <setup_payload/OnboardingCodesUtil.h>
 
+#include "matter_bridge.h"
 #include "reset_button.h"
+#include "sim_console.h"
 #include "thermostat_ep.h"
 
 using namespace esp_matter;
@@ -61,7 +63,10 @@ extern "C" void app_main(void)
     }
     if (!ok(thermostat_ep_create(node), "thermostat_ep_create") ||
         !ok(reset_button_start(factory_reset_action), "reset_button_start") ||
-        !ok(start(on_matter_event), "esp_matter::start")) {
+        !ok(sim_console_start(), "sim_console_start") ||
+        !ok(start(on_matter_event), "esp_matter::start") ||
+        !ok(matter_bridge_start(thermostat_ep_id(), sim_console_snapshot, thermostat_ep_update_own),
+            "matter_bridge_start")) {
         return;
     }
 }

@@ -5,7 +5,7 @@
 #include "freertos/task.h"
 
 #define RESET_BUTTON_GPIO GPIO_NUM_0  /* BOOT button */
-#define RESET_BUTTON_TASK_STACK 2048
+#define RESET_BUTTON_TASK_STACK 4096
 #define RESET_BUTTON_TASK_PRIORITY 1
 
 static reset_button_action_t s_action;
