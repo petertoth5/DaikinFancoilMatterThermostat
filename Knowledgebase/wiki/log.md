@@ -380,3 +380,18 @@ No raw files added or changed. Session facts (orchestrator + independent `build-
 - concepts/firmware-architecture: section 3 "NVS wear" note; section 6 row 2a-10; section 7 rows 015/016 + "Task 015 verified facts" (step 0 passed, lock contents, build, image size/partitions, warnings, bus guard, C++ deviation, GPIO0 reset); section 8 three 2a risks closed, new open item (D1–D7, N16R8 flash/PSRAM inferred, host tests blocked by `libbsd-dev`).
 - concepts/dev-environment: open question 2 step-0 result. index.md: firmware-architecture summary.
 - Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | NVS wear conflict fixed; 2a-10 60 s deferral approved; 015/016 commits
+No raw files added or changed. Sources: esp_matter 1.6.1 source (`esp_matter_data_model.cpp`, read by the `architect` 2026-11-25; external, not in raw), user decision (session 2026-11-25), git history (local inspection).
+- concepts/firmware-architecture section 3 "NVS wear": old "no NONVOLATILE flag" sentence marked superseded; current: OccupiedHeating/CoolingSetpoint + SystemMode NONVOLATILE; bridge pushes only changes (esp_matter also skips unchanged writes); deferred persistence on the 3 attributes, global `CONFIG_ESP_MATTER_DEFERRED_ATTR_PERSISTENCE_TIME_MS=60000` (rate limit, not quiet-period); boot behaviour (`first=true`, under 1 s, inferred); wear estimate 4,320 writes/day ~38 years (3 s: ~1.9 years), assumption half of 48 KB NVS free (unverified, `nvs_get_stats`).
+- Conflict recorded, not resolved: task-015 finding listed ControlSequenceOfOperation as NONVOLATILE too; architect note names only 3 attributes. Open item added in section 8.
+- Section 6 row 2a-10: 3 attributes, 60 s Kconfig, user approval of 60 s 2026-11-25. Section 7: 015 committed `9dbace6` (specs `bb2b004`), still not reviewed (review after 016); 016 being implemented by `firmware-dev`.
+- index.md unchanged (summaries still valid). Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | phase-2a result: task 016 reviewed + verified; CSO NONVOLATILE resolved; libbsd-dev installed
+No raw files added or changed. Session facts (orchestrator + independent agents, local inspection; esp_matter 1.6.1 source lines external, not in raw) and user decision (session 2026-11-25).
+- concepts/firmware-architecture section 7: rows 015/016 (feature-end review 015+016: 0 blocker, 2 major, 8 minor, fixed, delta-reviewed, re-verified; 016 not committed); new "Task 016 verified facts" (host 62/0/0, image 0x1b3260 = 42.5 %, check_no_bus, phase-1 regression 372 lint + 139/0/0, review fixes, accepted deviations, notes for 2b); accepted 015 deviations.
+- Section 3 "NVS wear": conflict resolved: ControlSequenceOfOperation is NONVOLATILE (`esp_matter_attribute.cpp:2131-2132`, `thermostat.cpp:368`), never updated (stays 4), writes rejected, no wear, no spec change.
+- Section 8: on-device item now 015 D1–D7 + 016 O1–O9 + NVS free space; new provisional items (a) standby exit with stale 233, (b) 247 bit 5 with stale 245/246; STAT both/neither bits provisional "unusable"; CSO and libbsd-dev items closed.
+- concepts/dev-environment: `libbsd-dev` installed, `~/esp-host-stubs` CPATH workaround no longer needed; open question 3 closed. index.md: firmware-architecture summary.
+- Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.

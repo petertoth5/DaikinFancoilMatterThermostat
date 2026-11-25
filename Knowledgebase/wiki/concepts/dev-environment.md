@@ -21,7 +21,7 @@ updated: 2026-11-25
 
 ## Host build facts (task 001, 2026-11-09; session implementation facts from verified build/test output, not in raw)
 - The linux host target (host tests) is selected with `idf.py --preview set-target linux` in IDF v6.0.2.
-- The linux host target needs `libbsd-dev`: **user action pending**, `sudo apt install libbsd-dev` (until then the session used a scratchpad `CPATH`/`LIBRARY_PATH` workaround).
+- The linux host target needs `libbsd-dev`: installed by the user (session 2026-11-25); phase-1 host tests run without the stub (139/0/0). The earlier `~/esp-host-stubs` `CPATH`/`LIBRARY_PATH` workaround is no longer needed.
 - esp-clang / clang-tidy are not installed.
 - The bus-access lint `firmware/tools/check_bus_access.py` (with its self-test) is stdlib-only Python and runs on every build ([[concepts/firmware-architecture]] section 3).
 - ELF check `firmware/tools/check_elf_symbols.py` forbids only `mbc_|mbm_|mbs_|mb_link_write` (line 22; local inspection by the orchestrator, session 2026-11-24). "No Wi-Fi / lwip / Matter linked" in the probe image was a manual `build-verifier` acceptance item, not enforced by tooling. The phase-2a Matter project gets its own separate bus-symbol check ([[concepts/firmware-architecture]] section 3).
@@ -50,5 +50,5 @@ Details, guards and phases: [[concepts/firmware-architecture]].
 ## Open questions
 1. Flashing/monitoring path from WSL2 (usbipd) or Windows — decide when a board is attached.
 2. `espressif/esp_matter` and its (large) dependencies are not yet added; architecture v0.3 approved 2026-11-08, added in phase 2 ([[concepts/firmware-architecture]]). **2026-11-24:** added in the separate project `firmware/matter/` (task 2a-A); step 0 checks it builds on IDF v6.0.2 from the registry only (user decision, session 2026-11-24). **2026-11-25:** step 0 passed (task 015: registry-only, offline configure from lock + cache; build `idf.py reconfigure` + `ninja -C build -j2`, about 26 min clean, no OOM; session fact, [[concepts/firmware-architecture]] section 7). *(Superseded 2026-11-24: "esp-modbus is added in task 002"; esp-modbus is not used, E2.)*
-3. `libbsd-dev` for the linux host target: user to install (`sudo apt install libbsd-dev`).
+3. Closed 2026-11-25: `libbsd-dev` installed by the user (session fact).
 4. User action: prepare the `python-matter-server` container and IPv6 on the NAS (session 2026-11-24).
