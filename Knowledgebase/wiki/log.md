@@ -405,3 +405,9 @@ No raw files added or changed. Sources: bench observation 2026-11-25 (user-run, 
 - concepts/dev-environment: "Flashing from WSL2" (usbipd-win, CH343 `/dev/ttyACM0`, erase-flash); controllers table: python-matter-server Container Manager setup, Android commissioning path, ASUS RT-AC88U IPv6 / roaming assistant / AP isolation fix; open questions 1 and 4 closed.
 - entities/esp32-s3-wroom-1: confirmed chip/flash/PSRAM/console facts from the boot log.
 - index.md: summaries of dev-environment, firmware-architecture, esp32-s3-wroom-1. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | task 017 done: station-only Wi-Fi, softAP closed
+No raw files added or changed. Sources: session facts (build-verifier, review, local git; not in raw), bench observation 2026-11-25 (user + orchestrator), CHIP/IDF source lines *(external)*.
+- concepts/firmware-architecture section 7: row 017 (done, `6b10c93`, spec + wiki `225bf37`, 2 optional log-text minors); phase-2a line; "Task 017 on device" (warning on first boot, `mode : sta`, network gone, HA reconnected; root cause H2, `ESP32Utils.cpp:116-120`); conflict recorded: `esp_wifi.h:382` "default mode is station" vs observed STA+AP after init.
+- Section 8: softAP item closed; on-device list now D6 + 017 D5, D7 Apple Home, O7/D4 status code, O9 idle 2 min, O3 timing, reset-task stack, NVS free space.
+- index.md: firmware-architecture summary. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
