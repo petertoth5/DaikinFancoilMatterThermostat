@@ -1,5 +1,8 @@
+#include <esp_event.h>
 #include <esp_log.h>
 #include <esp_matter.h>
+#include <esp_netif.h>
+#include <esp_wifi.h>
 #include <nvs_flash.h>
 #include <setup_payload/OnboardingCodesUtil.h>
 
@@ -48,11 +51,57 @@ bool ok(esp_err_t err, const char *what)
     return false;
 }
 
+// Same calls and order as the stack's own Wi-Fi init (ESP32Utils::InitWiFiStack), which then skips its copy.
+// Wi-Fi is initialised, not started.
+esp_err_t wifi_stack_init()
+{
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+    // INVALID_STATE: the default loop already exists, as esp_matter::start also accepts.
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        return err;
+    }
+    if (!esp_netif_get_handle_from_ifkey("WIFI_STA_DEF") && !esp_netif_create_default_wifi_sta()) {
+        return ESP_FAIL;
+    }
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    return esp_wifi_init(&cfg);
+}
+
+// The stack promotes an AP-only mode to STA+AP and keeps STA+AP, so the mode must be STA before
+// esp_matter::start; nothing changes it after esp_wifi_start. Also covers the boot after a factory reset.
+esp_err_t wifi_force_station_only()
+{
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_err_t err = esp_wifi_get_mode(&mode);
+    if (err != ESP_OK) {
+        return err;
+    }
+    switch (mode) {
+    case WIFI_MODE_STA:
+        ESP_LOGI(TAG, "Wi-Fi mode after init STA");
+        return ESP_OK;
+    case WIFI_MODE_NULL:
+        ESP_LOGI(TAG, "Wi-Fi mode after init NULL, setting STA");
+        break;
+    default:
+        ESP_LOGW(TAG, "Wi-Fi mode after init %s, forcing STA", mode == WIFI_MODE_AP ? "AP" : "STA+AP");
+        break;
+    }
+    return esp_wifi_set_mode(WIFI_MODE_STA);
+}
+
 }  // namespace
 
 extern "C" void app_main(void)
 {
     if (!ok(nvs_flash_init(), "nvs_flash_init")) {
+        return;
+    }
+    if (!ok(wifi_stack_init(), "wifi_stack_init") || !ok(wifi_force_station_only(), "wifi_force_station_only")) {
         return;
     }
     node::config_t node_config;

@@ -1,6 +1,7 @@
 idf_component_register(SRCS "app_main.cpp" "thermostat_ep.cpp" "reset_button.c" "sim_console.c"
                        INCLUDE_DIRS "."
                        REQUIRES esp_matter nvs_flash esp_driver_gpio esp_timer console freertos
+                                esp_wifi esp_netif esp_event
                                 sim_source mapping matter_bridge)
 
 # Our sources only; managed_components and IDF keep their own warning settings.
