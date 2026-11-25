@@ -355,3 +355,28 @@ No raw files added or changed. Session facts (verified output, not in raw) and u
 - Not changed: `tasks/`, `firmware/`, `docs/`, `raw/`, `.claude/`.
 
 ## [2026-11-24] sync | task 008 specs + wiki committed as `13b0591` and pushed (`17825cb`, `537200e`, `4be04e3`, `13b0591`); `main` in sync with `origin/main`, no page changes
+
+## [2026-11-24] sync | working-mode decisions S1–S5, phase-2a gate change, wiki slimmed (S2)
+No raw files added or changed. User decisions (session 2026-11-24, not in raw).
+- S1 wiki updated once per task at acceptance (progress in `RESUME.md` and git); S2 slim the wiki; S3 full `firmware-reviewer` only for bus-touching code, else `build-verifier` + one review at feature end, no re-review loop for text-only fixes; S4 fewer, bigger tasks, short specs, `firmware-dev` sonnet (haiku for small edits); S5 open questions batched once per task, recommended defaults for minor items.
+- Gate change: phase 2a (bus-independent Matter skeleton on a fake/simulated register model; no new bus code, no writes) may start now; phase 2b (real Modbus <-> Matter mapping, anything touching the bus) still waits for the probe log in `raw/` + `/capture`. Supersedes "stage 2/3 specs only after the probe log" for the bus-independent part only. Architect drafting the phase-2a plan.
+- New page concepts/firmware-history (progress diary, moved verbatim with citations: header addenda, section 1 item 6 notes, superseded D7 and lint texts, task 002/013/014/006/008/011 subsections in full, section 7 narrative and old table, section 8 full text incl. closed items, superseded v0.2, pre-slimming wording of the compacted sections).
+- concepts/firmware-architecture slimmed 678 -> 431 lines: section 1 phase 2a/2b; section 6 new "Working mode and gate" table, decisions as compact rows; section 7 compact task status table; section 8 one line per item, closed items moved.
+- concepts/project-goal: gate change and working-mode bullet; pointers to firmware-history. index.md: one-line summaries for project-goal and firmware-architecture, new firmware-history entry.
+- Not changed: `tasks/`, `firmware/`, `docs/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-24] sync | phase-2a plan approved; Matter controllers; ELF-check scope correction
+No raw files added or changed. User decisions and user statements (session 2026-11-24, not in raw); controller notes marked external, unverified.
+- Phase-2a plan (2a-1..2a-9): separate `firmware/matter/` project (esp_matter ^1.6.1, own sdkconfig/partitions, 16 MB inferred), reuses `daikin_regs` + `reg_model`, no bus code, DE not driven; EP1 read-only from `sim_source`, writes rejected, Fan in 2b; separate Matter bus-symbol check; tasks 2a-A (step 0 registry-only build stop) and 2a-B (ids pending); Q-HW2 moved to 2b.
+- Controllers: chip-tool + Home Assistant (Core, separate `python-matter-server`) + Apple Home for 2a; SmartThings on site later. User setup: HA Core in Docker on Synology, Apple TV, site has SmartThings hub.
+- Correction: `check_elf_symbols.py:22` forbids only `mbc_|mbm_|mbs_|mb_link_write`; "no Wi-Fi/lwip/Matter linked" was a manual `build-verifier` item, not tooling (orchestrator, local inspection). No earlier wiki text claimed tooling enforcement; clarification added.
+- concepts/firmware-architecture: section 1 phase 2a, section 3 ELF bullet, section 5 intro, section 6 gate row + new "Phase-2a plan" table, section 7 rows 2a-A/2a-B, section 8 risks (Q-HW2 -> 2b, RAM, image size, step 0).
+- concepts/dev-environment: ELF note, new "Matter controllers" table, open questions 2 and 4. concepts/project-goal: one line. index.md summaries.
+- Not changed: `firmware/`, `tasks/`, `docs/`, `raw/`, `.claude/`. Not committed.
+
+## [2026-11-25] sync | task 015 (Matter skeleton) build-verified; decision 2a-10 NONVOLATILE attributes
+No raw files added or changed. Session facts (orchestrator + independent `build-verifier`, local inspection) and user decision (session 2026-11-25, not in raw). Task 015 not yet reviewed or committed; wiki kept small (S1).
+- Decision 2a-10 "Accept + limit": esp_matter 1.6.1 creates both occupied setpoints, SystemMode and ControlSequenceOfOperation as NONVOLATILE (public API cannot clear it); keep the default, 016 updates only on change with `attribute::set_deferred_persistence`, architect adds a flash-wear estimate to spec 016; consequence: NVS write per change, stored value overrides initial value at boot until first update.
+- concepts/firmware-architecture: section 3 "NVS wear" note; section 6 row 2a-10; section 7 rows 015/016 + "Task 015 verified facts" (step 0 passed, lock contents, build, image size/partitions, warnings, bus guard, C++ deviation, GPIO0 reset); section 8 three 2a risks closed, new open item (D1–D7, N16R8 flash/PSRAM inferred, host tests blocked by `libbsd-dev`).
+- concepts/dev-environment: open question 2 step-0 result. index.md: firmware-architecture summary.
+- Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
