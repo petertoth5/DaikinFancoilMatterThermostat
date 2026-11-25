@@ -395,3 +395,6 @@ No raw files added or changed. Session facts (orchestrator + independent agents,
 - Section 8: on-device item now 015 D1–D7 + 016 O1–O9 + NVS free space; new provisional items (a) standby exit with stale 233, (b) 247 bit 5 with stale 245/246; STAT both/neither bits provisional "unusable"; CSO and libbsd-dev items closed.
 - concepts/dev-environment: `libbsd-dev` installed, `~/esp-host-stubs` CPATH workaround no longer needed; open question 3 closed. index.md: firmware-architecture summary.
 - Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
+
+## [2026-11-25] sync | task 016 commit ids
+No raw files added or changed. Session facts (local git, not in raw): task 016 code committed and pushed as `03dacf5`, wiki/RESUME record as `2f932e7`. concepts/firmware-architecture section 7: 016 row and phase-2a line now carry the commit id; index.md summary updated. Not changed: `raw/`, `firmware/`, `tasks/`. Not committed.
