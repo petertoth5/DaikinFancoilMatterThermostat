@@ -21,7 +21,8 @@ import re
 import subprocess
 import sys
 
-FORBIDDEN_PREFIXES = ("mb_link_", "rs485_port_", "mb_rtu_", "bus_task_", "mbc_", "mbm_", "mbs_")
+FORBIDDEN_PREFIXES = ("mb_link_", "rs485_port_", "mb_rtu_", "bus_task_", "mbc_", "mbm_", "mbs_",
+                      "write_guard_", "bus_write_")
 SANITY_SYMBOL = "app_main"  # defined in every image of this project
 UNDEFINED_TYPES = ("U", "w", "v")
 # nm lines: "<value> <type> <name>"; the value is blank for undefined symbols.

@@ -98,7 +98,7 @@ typedef struct write_guard {
     wg_cmd_type_t op_cmd;
     uint16_t op_reg, op_mask, op_target;
     uint16_t op_pre, op_new;
-uint8_t op_addr;   /* slave address of the PRE; WRITE and VERIFY go to it only */
+    uint8_t op_addr;   /* slave address of the PRE; WRITE and VERIFY go to it only */
     bool op_write_failed;
     ps_res_t op_write_res;
 } write_guard_t;

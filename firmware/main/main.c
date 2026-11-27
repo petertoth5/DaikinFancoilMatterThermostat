@@ -1,5 +1,6 @@
-/* main.c - phase-1 probe image entry (spec 006). Transceiver is held in receive first, then bus_task
- * and the console REPL start. No NVS, Wi-Fi or Matter. */
+/* main.c - phase-1 probe image entry (spec 006, 019). Transceiver is held in receive first, then the console
+ * REPL is created and the `mb` command registered, then bus_task and the REPL start. The REPL exists before
+ * bus_task so that the console driver setup cannot race bus_task's first output (P4). No NVS, Wi-Fi or Matter. */
 
 #include "bus_task.h"
 #include "esp_console.h"
@@ -70,10 +71,10 @@ static esp_err_t create_repl(esp_console_repl_t **repl)
 #endif
 }
 
-static esp_err_t start_console(void)
+/* Creates the REPL and registers the commands; it is started only after bus_task. */
+static esp_err_t prepare_console(esp_console_repl_t **repl)
 {
-    esp_console_repl_t *repl = NULL;
-    esp_err_t err = create_repl(&repl);
+    esp_err_t err = create_repl(repl);
     if (err != ESP_OK) {
         return err;
     }
@@ -81,18 +82,14 @@ static esp_err_t start_console(void)
     if (err != ESP_OK) {
         return err;
     }
-    err = mb_console_register(&s_cfg);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return esp_console_start_repl(repl);
+    return mb_console_register(&s_cfg);
 }
 
 void app_main(void)
 {
     s_cfg.hold_err = mb_link_hold_receive(&s_cfg.link);
 
-    /* Failure: no bus_task and no REPL, so the hold above stays until reboot. */
+    /* Failure here and in the console setup below: no bus_task, so the hold above stays until reboot. */
     if (console_uses_bus_uart()) {
         ESP_LOGE(TAG, "console UART is the bus UART; bus_task and console not started");
         return;
@@ -101,12 +98,18 @@ void app_main(void)
     /* Keeps the driver-install INFO line ("queue free spaces", uart.c, IDF v6.0.2) off bus_task's output. */
     esp_log_level_set("uart", ESP_LOG_WARN);
 
-    esp_err_t err = bus_task_start(&s_cfg);
+    esp_console_repl_t *repl = NULL;
+    esp_err_t err = prepare_console(&repl);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "console setup failed: %s; bus_task not started", esp_err_to_name(err));
+        return;
+    }
+    err = bus_task_start(&s_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "bus_task_start failed: %s", esp_err_to_name(err));
         return;
     }
-    err = start_console();
+    err = esp_console_start_repl(repl);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "console start failed: %s", esp_err_to_name(err));
     }

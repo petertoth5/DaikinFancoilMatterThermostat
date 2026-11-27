@@ -37,7 +37,7 @@ static int usage_error(const char *usage)
     return 1;
 }
 
-static bool parse_uint(const char *text, uint32_t min, uint32_t max, uint32_t *out)
+bool mb_console_parse_uint(const char *text, uint32_t min, uint32_t max, uint32_t *out)
 {
     if (text[0] == '\0' || text[0] == '-') {
         return false;
@@ -110,7 +110,11 @@ static int cmd_status(int argc, char **argv)
     }
     printf("log: %s, dropped %lu\n", snap.log_on ? "on" : "off", (unsigned long)snap.log_dropped);
     printf("bus_task stack high-water (minimum free): %lu bytes\n", (unsigned long)snap.stack_hwm);
+#if CONFIG_DMT_BUS_WRITE
+    mb_console_write_print_status(&snap.write);
+#else
     printf("write: compiled out\n");
+#endif
     if (!snap.link_ctr.measured) {
         printf("link counters: n/a\n");
         return 0;
@@ -192,8 +196,8 @@ static int cmd_read(int argc, char **argv)
 {
     static const char usage[] = "read <reg> [qty 1-4]";
     uint32_t reg, qty = MANUAL_QTY_MIN;
-    if (argc < 3 || argc > 4 || !parse_uint(argv[2], 0, REG_ADDR_MAX, &reg) ||
-        (argc == 4 && !parse_uint(argv[3], MANUAL_QTY_MIN, MANUAL_QTY_MAX, &qty))) {
+    if (argc < 3 || argc > 4 || !mb_console_parse_uint(argv[2], 0, REG_ADDR_MAX, &reg) ||
+        (argc == 4 && !mb_console_parse_uint(argv[3], MANUAL_QTY_MIN, MANUAL_QTY_MAX, &qty))) {
         return usage_error(usage);
     }
     return queue_command(BT_CMD_READ, reg, qty);
@@ -219,7 +223,7 @@ static int cmd_poll(int argc, char **argv)
 static int cmd_silence(int argc, char **argv)
 {
     uint32_t seconds = SILENCE_S_DEFAULT;
-    if (argc > 3 || (argc == 3 && !parse_uint(argv[2], SILENCE_S_MIN, SILENCE_S_MAX, &seconds))) {
+    if (argc > 3 || (argc == 3 && !mb_console_parse_uint(argv[2], SILENCE_S_MIN, SILENCE_S_MAX, &seconds))) {
         return usage_error("silence [seconds 1-600]");
     }
     return queue_command(BT_CMD_SILENCE, seconds, 0);
@@ -228,7 +232,7 @@ static int cmd_silence(int argc, char **argv)
 static int cmd_addr(int argc, char **argv)
 {
     uint32_t addr;
-    if (argc != 3 || !parse_uint(argv[2], ADDR_MIN, ADDR_MAX, &addr)) {
+    if (argc != 3 || !mb_console_parse_uint(argv[2], ADDR_MIN, ADDR_MAX, &addr)) {
         return usage_error("addr <1-247>");
     }
     return queue_command(BT_CMD_ADDR, addr, 0);
@@ -244,6 +248,18 @@ static int cmd_log(int argc, char **argv)
     }
     return usage_error("log on|off");
 }
+
+#if CONFIG_DMT_BUS_WRITE
+static int cmd_write(int argc, char **argv)
+{
+    bt_cmd_type_t type;
+    uint32_t a, b;
+    if (!mb_console_write_parse(argc, argv, &type, &a, &b)) {
+        return usage_error(MB_CONSOLE_WRITE_USAGE);
+    }
+    return queue_command(type, a, b);
+}
+#endif
 
 /* ---- mb stats ---- */
 
@@ -262,8 +278,13 @@ static int cmd_stats(int argc, char **argv)
     printf("txns %lu: ok %lu timeout %lu exception %lu bad_frame %lu error %lu\n", (unsigned long)st->txns,
            (unsigned long)st->ok, (unsigned long)st->timeout, (unsigned long)st->exception,
            (unsigned long)st->bad_frame, (unsigned long)st->error);
-    printf("kinds: retries %lu health_probes %lu sweeps %lu manual %lu\n", (unsigned long)st->retries,
+    printf("kinds: retries %lu health_probes %lu sweeps %lu manual %lu", (unsigned long)st->retries,
            (unsigned long)st->health_probes, (unsigned long)st->sweeps, (unsigned long)st->manual);
+#if CONFIG_DMT_BUS_WRITE
+    printf(" pre %lu write %lu verify %lu", (unsigned long)st->pre, (unsigned long)st->write,
+           (unsigned long)st->verify);
+#endif
+    printf("\n");
     printf("error rate (timeout+bad_frame+error)/txns: %lu.%lu %%\n", rate_permille / 10, rate_permille % 10);
     printf("offline entries %lu\n", (unsigned long)st->offline_entries);
     printf("latency ms (answered): min %lu median %lu max %lu\n", (unsigned long)st->lat_min_ms,
@@ -283,6 +304,9 @@ static const subcommand_t s_subcommands[] = {
     { "stats",   cmd_stats,   "stats" },
     { "addr",    cmd_addr,    "addr <1-247>" },
     { "log",     cmd_log,     "log on|off" },
+#if CONFIG_DMT_BUS_WRITE
+    { "write",   cmd_write,   MB_CONSOLE_WRITE_USAGE },
+#endif
 };
 
 static int cmd_mb(int argc, char **argv)

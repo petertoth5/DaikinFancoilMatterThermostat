@@ -1225,6 +1225,24 @@ TEST_CASE("e2e write m6: a pending PRE or WRITE is aborted when the bus goes awa
     }
 }
 
+TEST_CASE("e2e write m6b: a user disarm then poll_off before the PRE reports poll_off, no FC06", "[e2e_write]")
+{
+    wrig_t *r = &g_rig;
+    rig_ready(r);
+    arm_ok(r, WG_ARM_DEFAULT_S);
+    TEST_ASSERT_TRUE(command(r, WG_CMD_SP, SP_TARGET));   /* PRE pending */
+    disarm(r, WG_DISARM_USER);
+    disarm(r, WG_DISARM_POLL_OFF);   /* already disarmed: the hook still records the bus reason */
+    step_once(r);
+    expect_line(r, 'W', "ABORTED 231 poll_off");
+    TEST_ASSERT_FALSE(busy(r));
+    run_for(r, 10 * SECOND_MS);
+    expect_sequence(r, "");
+    TEST_ASSERT_EQUAL_UINT32(0, fake_write_count(&r->fake));
+    TEST_ASSERT_EQUAL_UINT8(0, status(r).failures);
+    rig_finish(r);
+}
+
 TEST_CASE("e2e write m7: DEGRADED does not stop a pending VERIFY", "[e2e_write]")
 {
     wrig_t *r = &g_rig;

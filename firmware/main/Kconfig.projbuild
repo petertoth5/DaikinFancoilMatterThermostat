@@ -109,6 +109,9 @@ menu "Daikin bus (phase 1 read probe)"
         bool "Enable bus writes (phase 3)"
         default n
         help
-            Not implemented before phase 3. Selecting it fails the build.
+            Write image of the phase-1 probe (spec 019): console-driven FC06 writes
+            (mb write ...), inert until armed. Set only by sdkconfig.defaults.write; the
+            image must be built in build_write/ (the build fails otherwise). Off: the
+            read image, no write code compiled.
 
 endmenu

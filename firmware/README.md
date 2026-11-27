@@ -8,10 +8,44 @@ ESP-IDF v6.0.2 only. Activate per shell: `. ~/esp/esp-idf-v6.0.2/export.sh`.
     idf.py build
 
 `sdkconfig.defaults` is applied on set-target. Kconfig menu "Daikin bus (phase 1 read probe)":
-`idf.py menuconfig`. `CONFIG_DMT_BUS_WRITE=y` fails CMake (phase 3 is not specified).
+`idf.py menuconfig`.
+
+### Build variants (spec 019)
+| Image | Build dir | Config | Content |
+|---|---|---|---|
+| read (default) | `build/` | `CONFIG_DMT_BUS_WRITE=n` | phase-1 read probe, no write code compiled |
+| write | `build_write/` | `CONFIG_DMT_BUS_WRITE=y` (`sdkconfig.defaults.write`) | read probe plus the `mb write` console commands, inert until armed |
+
+Write image (own sdkconfig in `build_write/`, the read image's `sdkconfig` is not touched):
+
+    cd firmware
+    idf.py -B build_write -D SDKCONFIG=build_write/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.write" set-target esp32s3   # first time only
+    idf.py -B build_write -D SDKCONFIG=build_write/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.write" build
+    idf.py -B build_write -p /dev/ttyACM0 flash
+
+CMake refuses a mismatch: `CONFIG_DMT_BUS_WRITE=y` in a build dir not named `build_write`, and
+`CONFIG_DMT_BUS_WRITE=n` in `build_write/`. The ELF check runs in the matching mode (below).
+
+Write-image console commands (`mb write ...`; absent from the read image). They only queue; `bus_task`
+decides. Syntax errors print the usage and queue nothing. Disarmed, every command is refused
+(`W <t> REFUSED <cmd> disarmed`).
+
+| Command | Effect |
+|---|---|
+| `mb write arm [30-600]` | arm for the given seconds (default 120); re-arm extends, never resets the 40-frame budget |
+| `mb write disarm` | end the session (stops writes, not reads) |
+| `mb write sp <5.0-40.0>` | setpoint, register 231, at most one decimal |
+| `mb write standby on\|off` | register 201 bit 7 (read-modify-write) |
+| `mb write fan auto\|silent\|night\|max` | register 201 bits 0-2 = 0/1/2/3 (read-modify-write) |
+| `mb write season 0\|3\|5` | register 233 |
+| `mb write restore` | write back the values captured at the first arm (201, 233, 231, only those that differ) |
+
+`mb status` shows `write: ...` and `restore set: ...` (read image: `write: compiled out`); `mb stats`
+appends ` pre <n> write <n> verify <n>` to the `kinds:` line; the log header ends ` writes=console`.
+`W`/`A` log lines and the `T` kinds PRE/WRITE/VERIFY: `docs/phase1-probe/checklist.md`.
 
 ## Bus-access lint and ELF symbol check
-`tools/check_bus_access.py` (rules R1-R8) and its `--self-test` run on every `idf.py build` (CMake
+`tools/check_bus_access.py` (rules R1-R9) and its `--self-test` run on every `idf.py build` (CMake
 target `bus_access_lint`); a violation or failing self-test fails the build. Manual run:
 `python3 tools/check_bus_access.py [--self-test]` from `firmware/`. It scans C/C++/assembly sources
 and files named `idf_component.yml` (R3 only) under `main/` and `components/`; comments and strings
@@ -25,8 +59,9 @@ are not exempt, backslash-newline continuations are spliced.
 | R4 | `uart_write_bytes*`, `uart_tx_chars`, `uart_set_rts/dtr/loop_back/line_inverse`, `_uart_set_pin*` banned; only the exact `uart_write_bytes` is allowed, in `components/rs485_port/src/`. Banned everywhere, also in `rs485_port/src/`: `uart_ll_*`, `uart_hal_*`, `uart_tx_one_char`, the ROM families `esp_rom_output_*`, `esp_rom_uart_*`, `esp_rom_install_*` (other `esp_rom_*` such as `esp_rom_delay_us` are allowed), raw register access `UART0.`/`UART1.`/`UART2.` and the pointer form `UART0->`, `REG_WRITE`/`WRITE_PERI_REG`/`REG_READ`/`READ_PERI_REG` whose arguments (within 200 characters, before the next `;`) name a `UART_FIFO*_REG`, includes of `uart_struct.h`, `uart_ll.h`, `uart_hal.h`, `uart_reg.h` (by basename) |
 | R5 | UART setup calls only in `components/rs485_port/` (`uart_set_pin`, `uart_set_mode`, `uart_driver_install/delete`, `uart_param_config`, `uart_read_bytes`, `uart_set_hw_flow_ctrl`, `uart_set_baudrate`, `uart_set_parity`, `uart_set_word_length`, `uart_set_stop_bits`, `uart_set_tx_idle_num`, `uart_enable_tx_intr`, `uart_flush` (not `uart_flush_input`), `uart_intr_config`, `uart_isr_register`); `uart_set_mode` only with `UART_MODE_RS485_HALF_DUPLEX` or `UART_MODE_UART` |
 | R6 | `CONFIG_DMT_BUS_TX_GPIO` / `CONFIG_DMT_BUS_DE_GPIO` only in `components/rs485_port/` and `main/` |
-| R7 | `mb_link_write*` only in `mb_link_write.c/.h` |
-| R8 | function-code bytes only in `mb_rtu`, only 0x03: `MB_FUNC_*` banned; `MB_RTU_FC_*` only in `components/mb_rtu/src/` (names `MB_RTU_FC_READ_HOLDING` = `0x03`, `MB_RTU_FC_READ_HOLDING_EXC` = `0x83`); in `mb_rtu`, `mb_link`, `rs485_port` hex literals 0x03/0x83 (except those two defines) and write codes (0x05, 0x06, 0x0F, 0x10, 0x15, 0x16, 0x17) are banned, as are compound assignments to `command`/`fc`/`func`/`func_code`/`function_code` (and, in `mb_link`/`rs485_port`, any assignment to them) and `++`/`--` on them, prefix or postfix (all three components) |
+| R7 | `mb_link_write*` only in `mb_link_write.c/.h` and `components/bus_task/src/bus_write.c` |
+| R8 | function-code bytes only in `mb_rtu`: `MB_FUNC_*` banned; `MB_RTU_FC_*` only in `components/mb_rtu/src/` (names `MB_RTU_FC_READ_HOLDING` = `0x03` and `MB_RTU_FC_READ_HOLDING_EXC` = `0x83` in `mb_rtu.c`; the write single register code and its exception variant as the two defines in `mb_rtu_write.c`); in `mb_rtu`, `mb_link`, `rs485_port` the hex literals 0x03/0x83 (except the read defines), 0x06/0x86 (except the two write defines) and the other write codes (0x05, 0x0F, 0x10, 0x15, 0x16, 0x17) are banned (also in `mb_link_write.c`), as are compound assignments to `command`/`fc`/`func`/`func_code`/`function_code` (and, in `mb_link`/`rs485_port`, any assignment to them) and `++`/`--` on them, prefix or postfix (all three components) |
+| R9 | the FC06 codec names `mb_rtu_build_fc06`, `mb_rtu_parse_fc06`, `mb_rtu_fc06_*` only in `mb_rtu_write.c/.h` and `mb_link_write.c` |
 
 Documented limits (not detected): `#include MACRO`, `##` token pasting, decimal/octal/binary
 function-code literals, function codes computed at run time or passed through variables,
@@ -47,14 +82,18 @@ exponential backtracking; linear for closed comments, quadratic for an untermina
 argument parser (001 code) is also quadratic on many repeated `uart_set_mode(` without `)`. The
 self-test also times every case (limit 5.0 s) so a regex that backtracks badly fails the build.
 
-`tools/check_elf_symbols.py --nm <nm> [--require SYM[,SYM...]] <elf>` runs after every link
-(`POST_BUILD` on the `.elf` target, `--nm ${CMAKE_NM}`, preceded by its `--self-test`). It fails
-if the image defines a symbol starting with `mbc_`, `mbm_`, `mbs_` or `mb_link_write`, if a
-`--require` symbol is not defined, or if nm/the ELF is missing or nm fails (it never skips). It also
+`tools/check_elf_symbols.py --nm <nm> [--mode read|write] [--require SYM[,SYM...]] <elf>` runs after every link
+(`POST_BUILD` on the `.elf` target, `--nm ${CMAKE_NM}`, `--mode` chosen from `CONFIG_DMT_BUS_WRITE` in
+`CMakeLists.txt`, preceded by its `--self-test`). It fails if the image defines a symbol starting with
+`mbc_`, `mbm_` or `mbs_`, if a `--require` symbol is not defined, or if nm/the ELF is missing or nm fails
+(it never skips). Mode `read` (default, the read image) additionally forbids the write path: prefixes
+`mb_link_write`, `mb_rtu_build_fc06`, `mb_rtu_parse_fc06`, `mb_rtu_fc06_`, `write_guard_`. Mode `write`
+(the write image) additionally requires `mb_link_write`, `mb_rtu_build_fc06` and `write_guard_step`. It also
 fails when the nm output yields no defined symbols or lacks `app_main` (wrong ELF or nm format), so an
 empty output cannot pass vacuously.
 Required symbols are set in `DMT_ELF_REQUIRED_SYMBOLS` in `CMakeLists.txt` (empty until task 006).
-Manual run: `python3 tools/check_elf_symbols.py --nm <xtensa-esp32s3-elf-nm> build/daikin_matter_thermostat.elf`.
+Manual run: `python3 tools/check_elf_symbols.py --nm <xtensa-esp32s3-elf-nm> [--mode write] build/daikin_matter_thermostat.elf`
+(`build_write/...` for the write image, with `--mode write`).
 esp-clang/clang-tidy is not installed (`idf.py clang-check`: "Espressif Clang was not found").
 
 ## Host tests (IDF `linux` target, Unity)

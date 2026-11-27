@@ -14,6 +14,16 @@
 #include "log_out.h"
 #include "txn_log.h"
 
+/* Write image only (spec 019b): the guard hooks and the header suffix. In the read image they vanish. */
+#if CONFIG_DMT_BUS_WRITE
+#include "bus_write.h"
+#define HEADER_WRITE_SUFFIX     " writes=console"
+#define disarm_writes(reason)   bus_write_disarm((reason), now_ms())
+#else
+#define HEADER_WRITE_SUFFIX     ""
+#define disarm_writes(reason)   ((void)0)
+#endif
+
 #define BUS_TASK_STACK_BYTES   4096
 #define BUS_TASK_PRIORITY      10
 #define BUS_TASK_CORE          1
@@ -85,7 +95,7 @@ static void emitf(const char *fmt, ...)
 
 static void emit_header(void)
 {
-    emitf("# dmt-probe v1 addr=%u baud=%lu fw=%s", (unsigned)s.sched.cfg.addr,
+    emitf("# dmt-probe v1 addr=%u baud=%lu fw=%s" HEADER_WRITE_SUFFIX, (unsigned)s.sched.cfg.addr,
           (unsigned long)s.cfg.link.port.baud, esp_app_get_description()->version);
 }
 
@@ -96,7 +106,8 @@ static void emit_link_error(const char *call, esp_err_t err)
 
 static void emit_txn(const ps_txn_t *t)
 {
-    bool always = t->req.kind == PS_KIND_MANUAL || t->req.kind == PS_KIND_SWEEP;
+    bool always = t->req.kind == PS_KIND_MANUAL || t->req.kind == PS_KIND_SWEEP || t->req.kind == PS_KIND_PRE ||
+                  t->req.kind == PS_KIND_WRITE || t->req.kind == PS_KIND_VERIFY;
     if (!always && !s.log_on) {
         return;
     }
@@ -141,6 +152,9 @@ static void publish_snapshot(void)
     s_snap.link_ctr = counters;
     s_snap.link_closed = s.link_closed;
     s_snap.silence_running = s.silence_running;
+#if CONFIG_DMT_BUS_WRITE
+    bus_write_get_status(now_ms(), &s_snap.write);
+#endif
     xSemaphoreGive(s_mutex);
 }
 
@@ -157,7 +171,7 @@ void bus_task_get_snapshot(bus_snapshot_t *out)
 
 /* ---- link adapter for poll_step ---- */
 
-static ps_res_t map_result(mb_link_res_t r)
+ps_res_t bus_task_map_result(mb_link_res_t r)
 {
     switch (r) {
     case MBL_OK:        return PS_RES_OK;
@@ -174,7 +188,7 @@ static ps_res_t map_result(mb_link_res_t r)
 static ps_res_t link_read(void *ctx, uint8_t addr, uint16_t reg, uint16_t qty, uint16_t *val, uint8_t *exc)
 {
     (void)ctx;
-    return map_result(mb_link_read(addr, reg, qty, val, exc));
+    return bus_task_map_result(mb_link_read(addr, reg, qty, val, exc));
 }
 
 /* ---- boot and on-demand silence check ---- */
@@ -186,6 +200,7 @@ static bool is_latched(void)
 
 static void latch(void)
 {
+    disarm_writes(WG_DISARM_LATCHED);
     s.link_ready = false;
     poll_sched_latch(&s.sched);
 }
@@ -233,6 +248,7 @@ static void command_poll_on(void)
 static void command_poll_off(void)
 {
     s.auto_start_cancelled = true;
+    disarm_writes(WG_DISARM_POLL_OFF);     /* before the stop: a pending VERIFY must not go out */
     poll_sched_stop(&s.sched);
 }
 
@@ -252,6 +268,7 @@ static void command_probe(void)
 
 static void command_addr(uint32_t addr)
 {
+    disarm_writes(WG_DISARM_ADDR);         /* before the address changes: a VERIFY would read another slave */
     if (poll_sched_set_addr(&s.sched, (uint8_t)addr, now_ms()) < 0) {
         emit_line("# mb addr refused: outside 1..247");
         return;
@@ -276,6 +293,7 @@ static void command_silence(uint32_t seconds)
         return;
     }
     s.auto_start_cancelled = true;
+    disarm_writes(WG_DISARM_SILENCE);      /* before the stop and the link close */
     poll_sched_cancel_manual(&s.sched);     /* a pending read must not go out after the check */
     poll_sched_stop(&s.sched);
     s.link_ready = false;
@@ -306,6 +324,11 @@ static void handle_command(const bt_cmd_t *c)
     case BT_CMD_ADDR:     command_addr(c->a); break;
     case BT_CMD_SILENCE:  command_silence(c->a); break;
     case BT_CMD_LOG:      command_log(c->a != 0); break;
+#if CONFIG_DMT_BUS_WRITE
+    case BT_CMD_WRITE_ARM:    bus_write_arm(c->a, now_ms()); break;
+    case BT_CMD_WRITE_DISARM: bus_write_disarm(WG_DISARM_USER, now_ms()); break;
+    case BT_CMD_WRITE:        bus_write_command((wg_cmd_type_t)c->a, (uint16_t)c->b, now_ms()); break;
+#endif
     }
 }
 
@@ -362,6 +385,7 @@ static void track_link_faults(void)
         return;
     }
     s.faults_seen = counters.faults;
+    disarm_writes(WG_DISARM_LINK);
     if (s.link_closed) {
         return;
     }
@@ -370,6 +394,26 @@ static void track_link_faults(void)
 }
 
 /* ---- task ---- */
+
+/* One bus transaction: the write guard in the write image, plain poll_step otherwise. */
+static bool step_bus(const ps_env_t *env, ps_txn_t *txn, int64_t *wait_until_ms)
+{
+#if CONFIG_DMT_BUS_WRITE
+    return bus_write_step(env, txn, wait_until_ms);
+#else
+    return poll_step(&s.sched, &s.model, env, txn, wait_until_ms);
+#endif
+}
+
+/* The W and A lines of the step, printed after its T line. true: there were some. */
+static bool emit_write_events(void)
+{
+#if CONFIG_DMT_BUS_WRITE
+    return bus_write_emit_events();
+#else
+    return false;
+#endif
+}
 
 static TickType_t idle_wait_ticks(int64_t wait_until_ms)
 {
@@ -402,9 +446,15 @@ static void bus_task_main(void *arg)
             continue;
         }
         ps_txn_t txn;
-        if (poll_step(&s.sched, &s.model, &env, &txn, &wait_until_ms)) {
+        bool done = step_bus(&env, &txn, &wait_until_ms);
+        if (done) {
             emit_txn(&txn);
+        }
+        bool events = emit_write_events();
+        if (done) {
             track_link_faults();
+        }
+        if (done || events) {
             report_health(false);
             publish_snapshot();
         }
@@ -427,6 +477,12 @@ esp_err_t bus_task_start(const bus_task_config_t *cfg)
     }
     reg_model_init(&s.model, (int64_t)cfg->sched.fast_ms * STALE_PERIOD_FACTOR,
                    (int64_t)cfg->sched.slow_ms * STALE_PERIOD_FACTOR);
+#if CONFIG_DMT_BUS_WRITE
+    esp_err_t write_err = bus_write_init(&s.sched, &s.model, &cfg->link, emit_line);
+    if (write_err != ESP_OK) {
+        return write_err;
+    }
+#endif
     s.log_on = true;    /* default on from power-up (spec 006) */
     s.reported_health = PS_STOPPED;
 

@@ -1,0 +1,3 @@
+# Write image of the phase-1 probe (spec 019): console-driven FC06 writes, inert until armed.
+# Overlay on sdkconfig.defaults; build with -B build_write (see README.md).
+CONFIG_DMT_BUS_WRITE=y

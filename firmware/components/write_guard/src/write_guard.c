@@ -264,6 +264,8 @@ static void disarm_internal(write_guard_t *w, wg_reason_t reason, int64_t now_ms
         w->restore_active = false;
         w->last_disarm = reason;
         push_event(ev, WG_EV_DISARMED, now_ms)->reason = reason;
+    } else if (bus_gone(reason)) {
+        w->last_disarm = reason;   /* a VERIFY may still be pending; its ABORTED line names this reason */
     }
     if (w->phase == WG_PHASE_VERIFY && bus_gone(reason)) {
         register_failure(w, now_ms, ev, WG_FAIL_VERIFY_LOST, PS_RES_ERROR, 0);

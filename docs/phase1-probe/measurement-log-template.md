@@ -45,6 +45,15 @@ Copy this file, fill it in, and save it with the complete serial output as descr
 | `B16.activity` B.16 RO direct: boot silence activity per boot (latch: reboot, at most 2 repeats; e.g. `1, 0`) | | count |
 | `B16.results` B.16: all `T` lines TIMEOUT y/n; any BADFRAME y/n (STOP if y) | | |
 | `B16.gap` B.16 `gap_bytes` (> 0: STOP, back to the architect) | | bytes |
+| `BW.verifier` B.W.1 `build-verifier`: both builds, lint and ELF (read and write mode) passed y/n | | |
+| `BW.fw` B.W.1 `fw=` of the write image; header ends `writes=console` y/n | | |
+| `BW.b16` B.W.2 B.16 repeated with the write image: all `T` lines TIMEOUT y/n; any BADFRAME y/n; boot activity; `gap_bytes` | | |
+| `BW.status` B.W.3 `write: disarmed, budget 40/40, failures 0/3` and `restore set: none` y/n | | |
+| `BW.refused` B.W.4 the five disarmed refusals printed, no `T ... PRE|WRITE|VERIFY` line y/n | | |
+| `BW.arm` B.W.5 `A <t> REFUSED arm health` (OFFLINE and after `mb poll off`) y/n; the six syntax cases printed the usage y/n | | |
+| `BW.de_v` B.W.6 DE level, `kinds:` line ends `pre 0 write 0 verify 0` y/n | | V |
+| `BW.stack` B.W.7 bus_task stack high-water after B.W.1-B.W.6 (< 1024: STOP) | | bytes |
+| `BW.slave` B.W.9 E.2-E.7 against a PC slave simulator, or "not done" | | |
 
 ### B.5 silence cycles
 
@@ -111,6 +120,29 @@ Indirect evidence (multimeter DC readings average the level; they cannot show a 
 | `D9.regs` 105 bit 0 / 104 bit 12 after resume | / | |
 | `D10.result` `mb silence 60` result line | | |
 | `D11.*` panel and fancoil normal after disconnect; "+ A B -" untouched y/n | | |
+| `E0.stats1` / `E0.stats2` `mb stats` totals >= 10 min apart (txns, timeout, bad_frame, error each) | / | |
+| `E0.rate` (timeout + bad_frame + error deltas) / txns delta (< 1 % required) | | % |
+| `E0.badframe` delta bad_frame (must be 0) | | count |
+| `E0.regs` `mb regs`: 201, 231, 233, 202, 203, 247 (and 245/246 if 247 flag 5) `ok` and `fresh` y/n | | |
+| `E0.web` 247 raw / flags 1, 2, 3, 6, 7, 8 all 0 y/n; flags 4 and 5 | | |
+| `E0.initial` panel state (setpoint, fan mode, season, standby) and raw 201 / 231 / 233 / 008 | | |
+| `E2.arm` the `A` lines after `mb write arm` (ARMED, RESTORE_SET, or REFUSED reason; equal to `E0.initial` y/n) | | |
+| `E3.skip` E.3 skipped because neither `initial+0.5` nor `initial-0.5` lies within the limits (reason, values; "not skipped" otherwise) | | |
+| `E7.final` raw 201 / 231 / 233 after `mb write restore` and the panel state; equal to `E0.initial` y/n | | |
+| `E.fail` any `W ... FAIL`, `A ... LATCHED` or unexpected `A ... DISARMED` lines, with times | | |
+
+### Control actions (E)
+
+One row per `mb write` command typed in E. W/A result line: the `W <t> DONE ...` / `SKIP` / `FAIL` / `REFUSED` line exactly as printed.
+
+| Wall-clock time | Command | W/A result line | Panel display | Fancoil behaviour |
+|---|---|---|---|---|
+| | | | | |
+| | | | | |
+| | | | | |
+| | | | | |
+| | | | | |
+| | | | | |
 
 ### D.8 soak: `mb stats` and link counters
 

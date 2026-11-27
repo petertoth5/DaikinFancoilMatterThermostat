@@ -465,3 +465,27 @@ These are the architect's rulings on the deviations `firmware-dev` reported for 
 - **A8. Flag-4 upper clamp.** Accepted: the low end is tested only. 203 cannot exceed 350 raw without being `out_of_range` (not fresh OK). The clamp code stays as defence in depth.
 - **A9. Lint scope of the function-code literals.** Accepted as implemented: 0x05/0x06/0x0F/0x10/0x15-0x17/0x86 are banned in `components/mb_rtu/`, `components/mb_link/` (including `mb_link_write.c`) and `components/rs485_port/`. Only the two defines in `mb_rtu_write.c` are allowed. "Anywhere" in WR/acceptance 3 is replaced by this scope. Reason: 0x10 is a common non-FC literal elsewhere, and frames can only be built in these components (the R1-R9 call-site rules).
 - **A10. `firmware/README.md`** is added to the 019b files allowed to change. Only these parts may change: the build variants and write build command, lint R7-R9, the ELF `--mode read|write`, and the write-image console commands. Each part must match the implementation.
+
+## Amendments 2026-11-27 (019b review)
+Rulings after `firmware-reviewer` (GO) and `build-verifier` (all pass except 7(d)). Where they differ from the text above, they win.
+
+- **B1. W3 and acceptance 7(d) are replaced.** `firmware/matter` never had a `CONFIG_DMT_BUS_WRITE` guard. The symbol does not exist in that project, and the project compiles no bus or write source. So a Kconfig FATAL there would prove nothing. The Matter-side guard is the existing ELF check:
+  - `firmware/matter/tools/check_no_bus.py` `FORBIDDEN_PREFIXES` gains `"write_guard_"` and `"bus_write_"`. `mb_link_write*` and `mb_rtu_*_fc06*` are already covered by `mb_link_` and `mb_rtu_`.
+  - Goal line W3 now reads: "The Matter project stays write-free until phase 3 (W1). Its POST_BUILD `check_no_bus.py` rejects any write symbol (W3)."
+  - New 7(d): `check_no_bus.py --nm` on the phase-1 **write** ELF fails and lists `write_guard_` and `bus_write_` symbols. On the Matter ELF it passes.
+  - Exception to "Not allowed `firmware/matter/**`" and to acceptance 8: only the `FORBIDDEN_PREFIXES` tuple in `check_no_bus.py` may change.
+- **B2. Fixed now:**
+  - checklist E.0.3 and E.3 (the setpoint limits);
+  - checklist line 7;
+  - the `gap_bytes` record after a `write_TIMEOUT`;
+  - the ABORTED reason;
+  - the indentation in `write_guard.h`;
+  - the stale comment in `sdkconfig.defaults` (comment only; this file is added to the allowed files for that purpose);
+  - a note in E about lines lost when the log ring drops.
+- **B3. Left as is:**
+  - `command_addr` disarms before the address is validated. This is unreachable, because the console limits the address to 1..247. Disarming early is the safe direction.
+  - `strtoul` accepts `+3`/`03` for season. The value is still gated to {0, 3, 5} (A3).
+  - Build commands (deviation 5). The two-step `set-target` + `build` form in the README is verified, so it stays. `flash` without `-D SDKCONFIG` reuses the build dir cache, and the CMake guard stops a wrong build.
+  - `log_out` ring drop: accepted, with the docs note from B2.
+  - B.W.7 (stack high-water >= 1024 B with the write image) stays a bench condition. It must pass before the trip.
+- **B4. Review rule (S3).** Text-only fixes need no re-review. The code nits (ABORTED reason, indentation, prefixes, comment) are checked by `build-verifier` only.
