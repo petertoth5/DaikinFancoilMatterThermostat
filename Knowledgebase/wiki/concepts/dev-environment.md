@@ -1,7 +1,7 @@
 ---
 title: Dev environment
 type: concept
-sources: ["project-brief.md"]
+sources: ["project-brief.md", "ESP32-S3-DEV-N16R8-US_EN_10048120 (1).pdf"]
 updated: 2026-11-28
 ---
 
@@ -22,6 +22,7 @@ updated: 2026-11-28
 ## Flashing from WSL2 (user setup, bench observation 2026-11-25, user + orchestrator; not in raw)
 - `usbipd-win` on Windows (not the Linux `usbipd`): `usbipd attach --wsl --busid 2-1`.
 - The board's UART port is a CH343 -> `/dev/ttyACM0` in WSL.
+- Connector labels (user observation of the physical board 2026-11-28, not in raw): the two USB-C ports are labelled "COM" and "USB"; **COM = CH343 UART port** (used for flashing and the console so far), USB = native ESP32-S3 USB *(mapping inferred from the labels and [[sources/yd-esp32-s3-coreboard-schematic]] p2; see [[entities/yd-esp32-s3-coreboard]])*.
 - `erase-flash` before the first Matter flash. Verified by the successful 2026-11-25 flash and run ([[concepts/firmware-architecture]] section 7).
 
 ## Host build facts (task 001, 2026-11-09; session implementation facts from verified build/test output, not in raw)

@@ -488,3 +488,11 @@ Board schematic "YD-ESP32-S3-COREBOARD" (VCC-GND studio, 2022/6/1, rev "*") behi
 - New sources/yd-esp32-s3-coreboard-schematic and entities/yd-esp32-s3-coreboard (connectors, power path, J1/J2 pinout, peripherals, hazards, open questions).
 - **Correction (wiki hypothesis, not a source conflict):** "5 V pin only fed from the other USB connector" is wrong; J1-21 is an input behind D3, tied to the 5 V net only if the 0 Ω "IN-OUT" link is fitted (inferred explanation of the user's 2026-11-27 observation, to confirm on the board). Updated in entities/esp32-s3-wroom-1, entities/max485, concepts/firmware-architecture s4 (bench wiring) and s8 (bench power item); old wording struck, not deleted.
 - index.md: two sources, one entity added; esp32-s3-wroom-1 and firmware-architecture summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/` (`docs/BOM.md` checked: no 5 V pin claim). Not committed.
+
+## [2026-11-28] sync | user board observations: IN-OUT bridge empty, USB-C labels COM / USB
+No raw files added or changed. Source: user observation of the physical board, session 2026-11-28 (not in raw), relayed by the orchestrator; combined with [[sources/yd-esp32-s3-coreboard-schematic]] p2.
+- entities/yd-esp32-s3-coreboard: "IN-OUT" bridge (front, labelled "inout") is empty -> 5 V header pin J1-21 is not fed from either USB port; "5 V pin seems not working" explained (board identity still inferred); consequence: the 5 V pin cannot power the MAX485 module without soldering (user cannot solder), module stays on 3V3. USB-C labels "COM" / "USB"; COM = USB1 CH343P, USB = USB2 native *(mapping inferred)*. Open questions: IN-OUT and labels answered; PCB board name unknown to the user (low priority, still open).
+- entities/esp32-s3-wroom-1, entities/max485: 5 V notes amended with the confirmation.
+- concepts/firmware-architecture s4 bench wiring: confirmation added; s8 bench-power item closed (explained by user observation + schematic). s8 GPIO4/5/6 reset pull state item unchanged (series datasheet skipped by the user for now).
+- concepts/dev-environment: flashing note on the connector labels (COM = CH343 port); front matter sources += the schematic file.
+- index.md: yd-esp32-s3-coreboard and esp32-s3-wroom-1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
