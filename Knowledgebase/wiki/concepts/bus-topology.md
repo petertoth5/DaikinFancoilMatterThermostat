@@ -2,14 +2,14 @@
 title: Bus topology (planned)
 type: concept
 sources: ["project-brief.md", "EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf", "MAX485-M_EN_10035508.pdf", "20261107_192127.jpg"]
-updated: 2026-11-27
+updated: 2026-11-28
 ---
 
 # Bus topology (planned)
 
 **Current state** ([[sources/project-brief]]): one [[entities/ekwhctrl1]] and one fancoil [[entities/inn-fr-b32]], directly connected. **Target:** add the new ESP32-S3 node ([[entities/esp32-s3-wroom-1]] + [[entities/max485]]) without interrupting the existing panel <-> fancoil traffic.
 
-> **2026-11-08 (user decisions): tap point = EKWHCTRL1 "A A B B -" ModBus RTU port, NOT the "+ A B -" fancoil link. Nothing else is connected to "A A B B -". The node is the SOLE Modbus master on "A A B B -" (FC03 polling, FC06 only on Matter commands). Staged phasing: on-site read probe -> Matter read-only mirror -> Matter writes. Architecture v0.2 superseded; **v0.3 approved by the user 2026-11-08** ([[concepts/firmware-architecture]]).** Sections dated 2026-11-07 that assume "+ A B -" or a shared bus are kept as history and marked superseded.
+> **2026-11-08 (user decisions): tap point = EKWHCTRL1 "A A B B -" ModBus RTU port, NOT the "+ A B -" fancoil link. Nothing else is connected to "A A B B -". The node is the SOLE Modbus master on "A A B B -" (FC03 polling, FC06 only on Matter commands; amended 2026-11-27 (OS6 / W1): plus console-only writes in the phase-1 write image). Staged phasing: on-site read probe -> Matter read-only mirror -> Matter writes. Architecture v0.2 superseded; **v0.3 approved by the user 2026-11-08** ([[concepts/firmware-architecture]]).** Sections dated 2026-11-07 that assume "+ A B -" or a shared bus are kept as history and marked superseded.
 
 Resulting topology *(inferred from the user answers)*: point-to-point segment **node (master) <-> EKWHCTRL1 "A A B B -"**; the "+ A B -" panel <-> fancoil link stays untouched by the node.
 
@@ -21,8 +21,8 @@ Link facts for that segment: 9600 8N1, FC 03/06 ([[concepts/modbus-rs485-link]],
 ## User answers (session 2026-11-08, second round, stated by the user; not in raw)
 - **Manual read by the user:** one of the two N420384A PDFs already in raw ([[sources/n420384a-english]], [[sources/n420384a-modbus-rtu]]); no new source.
 - **Nothing is connected to the EKWHCTRL1 "A A B B -" port today.** Answers the 2026-11-08 "anything else connected?" question.
-- **Role on "A A B B -": the node is the SOLE Modbus master.** Periodic **FC03** polling mirrors panel/fancoil state into Matter; **FC06** writes only on Matter commands. **Supersedes** the 2026-11-07 "passive monitor by default" role (text kept below), which only made sense for a shared bus.
-- **Phasing (staged):** phase 1 = on-site read probe (confirm slave address, A/B polarity, which registers answer); phase 2 = Matter read-only mirror; phase 3 = Matter writes with readback and limits. **Write code compiled out until phase 3.**
+- **Role on "A A B B -": the node is the SOLE Modbus master.** Periodic **FC03** polling mirrors panel/fancoil state into Matter; **FC06** writes only on Matter commands (amended 2026-11-27, OS6 / W1: plus console-only writes in the phase-1 write image). **Supersedes** the 2026-11-07 "passive monitor by default" role (text kept below), which only made sense for a shared bus.
+- **Phasing (staged):** phase 1 = on-site read probe (confirm slave address, A/B polarity, which registers answer); phase 2 = Matter read-only mirror; phase 3 = Matter writes with readback and limits. **Write code compiled out until phase 3.** *(Amended 2026-11-27, user OS6 / W1: console-only writes in a separately built phase-1 write image, task 019; [[concepts/firmware-architecture]] section 1.)*
 - **"-AB+"** in the user's earlier message meant the **"+ A B -"** block (panel <-> fancoil, stays untouched by the node). The earlier "(inferred)" reading is now confirmed by the user.
 - Consequence *(inferred from these answers)*: second-master arbitration and bus-idle detection no longer apply on "A A B B -" (sole master, nothing else connected).
 
@@ -66,7 +66,7 @@ Details and quotes: [[entities/ekwhctrl1]]. Summary:
 ## Open questions
 **Answered**
 - Q1 tap point: *(superseded 2026-11-08)* "+ A B -" block of EKWHCTRL1 (user, 2026-11-07); fancoil pair confirmed on that block (item 1a below). **Now: "A A B B -", see item 6.**
-- Q2 role: *(2026-11-07: passive monitor + Matter-triggered master; superseded)* **Now: sole Modbus master on "A A B B -"**, FC03 polling, FC06 only on Matter commands (user, 2026-11-08).
+- Q2 role: *(2026-11-07: passive monitor + Matter-triggered master; superseded)* **Now: sole Modbus master on "A A B B -"**, FC03 polling, FC06 only on Matter commands (user, 2026-11-08; amended 2026-11-27, OS6 / W1: plus console-only writes in the phase-1 write image).
 - Q3 MAX485-M: breakout board with RO/RE/DE/DI header, separate DE/RE ([[sources/max485-module-photo]]). *Hardware details still open, see below.*
 - Q4 own slave address: not needed; the node is the master (follows from Q2).
 - Q5 polarity: for EKWHCTRL1 no conflict ever existed (both files print "+ A B -"), and the user confirmed the label on the hardware. The "+AB-"/"+BA-" legend conflict concerns only EKRTCTRL1 (not installed here) and stays an unresolved source conflict ([[concepts/modbus-rs485-link]]).

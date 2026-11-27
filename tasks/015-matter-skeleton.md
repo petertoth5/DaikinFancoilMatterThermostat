@@ -1,6 +1,6 @@
 # 015 Matter skeleton (phase 2a, part A)
 
-Status: spec ready. Plan approved by the user 2026-11-24. Model: **sonnet** (new framework integration, build-system judgement; not mechanical). After the task: `build-verifier`; the single feature review comes after 016 (S3).
+Status: done (committed 9dbace6; reviewed with 016). Plan approved by the user 2026-11-24. Model: **sonnet** (new framework integration, build-system judgement; not mechanical). After the task: `build-verifier`; the single feature review comes after 016 (S3).
 
 ## Goal
 A separate, flashable IDF project `firmware/matter/` with esp_matter, BLE + Wi-Fi commissioning and a Thermostat endpoint EP1 holding **static** values, plus a post-build guard proving that no bus code is linked. The phase-1 project stays byte-for-byte unchanged.

@@ -1,6 +1,6 @@
 # 019 Console-driven writes in a phase-1 write variant (OS6 control test)
 
-Status: spec ready. It implements the architect's console-write design of 2026-11-27 (W1-W14) with the user decisions of 2026-11-27, relayed by the orchestrator. W4 and W8 were changed by the user. wiki-keeper records the decisions in `concepts/firmware-architecture` section 6 (OS6).
+Status: 019a done (committed 2d8ec44 incl. A6; amendments in 0075304); 019b done (committed f65f465; fixes B1-B4, firmware-reviewer GO, build-verifier all pass, host tests 201/0/0). Acceptance pending: bench B.W run with the write image, then the on-site E run. It implements the architect's console-write design of 2026-11-27 (W1-W14) with the user decisions of 2026-11-27, relayed by the orchestrator. W4 and W8 were changed by the user. wiki-keeper records the decisions in `concepts/firmware-architecture` section 6 (OS6).
 
 **See "Amendments 2026-11-27 (019a review)" at the end. It overrides the text above where they differ, and it adds a 019a fix-up (A6) that must land before the 019a commit.**
 

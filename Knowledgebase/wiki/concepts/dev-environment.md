@@ -2,7 +2,7 @@
 title: Dev environment
 type: concept
 sources: ["project-brief.md"]
-updated: 2026-11-25
+updated: 2026-11-28
 ---
 
 # Dev environment
@@ -29,7 +29,7 @@ updated: 2026-11-25
 - The linux host target needs `libbsd-dev`: installed by the user (session 2026-11-25); phase-1 host tests run without the stub (139/0/0). The earlier `~/esp-host-stubs` `CPATH`/`LIBRARY_PATH` workaround is no longer needed.
 - esp-clang / clang-tidy are not installed.
 - The bus-access lint `firmware/tools/check_bus_access.py` (with its self-test) is stdlib-only Python and runs on every build ([[concepts/firmware-architecture]] section 3).
-- ELF check `firmware/tools/check_elf_symbols.py` forbids only `mbc_|mbm_|mbs_|mb_link_write` (line 22; local inspection by the orchestrator, session 2026-11-24). "No Wi-Fi / lwip / Matter linked" in the probe image was a manual `build-verifier` acceptance item, not enforced by tooling. The phase-2a Matter project gets its own separate bus-symbol check ([[concepts/firmware-architecture]] section 3).
+- ELF check `firmware/tools/check_elf_symbols.py` forbids only `mbc_|mbm_|mbs_|mb_link_write` (line 22; local inspection by the orchestrator, session 2026-11-24). *(Superseded 2026-11-28 by task 019: the script has `--mode read|write`; read mode forbids the write-path prefixes, write mode requires `mb_link_write`, `mb_rtu_build_fc06`, `write_guard_step`; local inspection `check_elf_symbols.py:22-27`; [[concepts/firmware-architecture]] section 3.)* "No Wi-Fi / lwip / Matter linked" in the probe image was a manual `build-verifier` acceptance item, not enforced by tooling. The phase-2a Matter project gets its own separate bus-symbol check ([[concepts/firmware-architecture]] section 3).
 
 ## Matter controllers (phase 2a; user statement / user decision, session 2026-11-24, user setup 2026-11-25; not in raw)
 | Item | Fact |

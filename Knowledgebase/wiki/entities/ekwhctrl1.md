@@ -2,7 +2,7 @@
 title: EKWHCTRL1 wall control
 type: entity
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-08
+updated: 2026-11-28
 ---
 
 # EKWHCTRL1
@@ -27,7 +27,7 @@ Legend: "1. Terminal block for device connection", "2. The terminal block for CP
 - **Registers:** p4 map is for "the INN-FR-B32 and EKWHCTRL0 board and the EKRTCTRL1 and EKWHCTRL1 wall-mounted control panel"; starred registers are "Only for INN-FR-B32 board"; whether the panel proxies them is not stated ([[concepts/register-map]]).
 
 ## This installation (user statements, not in raw)
-- **2026-11-08 (user, second round):** **nothing is connected to "A A B B -" today.** The node will be the **sole Modbus master** on "A A B B -" (FC03 polling, FC06 only on Matter commands); staged phasing read probe -> read-only mirror -> writes ([[concepts/bus-topology]]). The user's "-AB+" meant "+ A B -" (panel <-> fancoil, untouched by the node).
+- **2026-11-08 (user, second round):** **nothing is connected to "A A B B -" today.** The node will be the **sole Modbus master** on "A A B B -" (FC03 polling, FC06 only on Matter commands; amended 2026-11-27, OS6 / W1: plus console-only writes in the phase-1 write image, [[concepts/firmware-architecture]] section 1); staged phasing read probe -> read-only mirror -> writes ([[concepts/bus-topology]]). The user's "-AB+" meant "+ A B -" (panel <-> fancoil, untouched by the node).
 - **2026-11-08 (user decision):** the new node connects to the **"A A B B -"** ModBus RTU port, **not** to "+ A B -". User: "I found out that the -AB+ connector is really for the direct connection of the fancoil to the thermostat. So this connector is not the modbus we shall use but we have to use the AABB connector instead. This needs a redesign [...]" (full quote in [[concepts/bus-topology]]). Agrees with the manual p3 legend (A = Modbus RTU, B = fancoil). Redesign recorded as architecture v0.3, approved by the user 2026-11-08 ([[concepts/firmware-architecture]]).
 - 2026-11-07: the fancoil pair is physically on the **"+ A B -"** block (still valid). *(Superseded 2026-11-08: "the new node is to tap in on that pair".)* This **agrees** with the manual ("+ A B -" = serial connection for fancoil). No source-vs-user conflict exists here.
 

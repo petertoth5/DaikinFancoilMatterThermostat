@@ -1,6 +1,6 @@
 # 016 Simulated register model + provisional read-only mapping (phase 2a, part B)
 
-Status: spec ready. Plan approved by the user 2026-11-24; amended 2026-11-25 for NONVOLATILE attributes (user decision "Accept + limit", section "NVS persistence"). Depends on 015. Model: **sonnet** (pure logic + host tests + esp_matter glue). After the task: `build-verifier`, then the **one** `firmware-reviewer` review of the phase-2a feature (015 + 016); text-only fixes get no re-review (S3).
+Status: done (committed 03dacf5; feature review and verification recorded in 2f932e7). Plan approved by the user 2026-11-24; amended 2026-11-25 for NONVOLATILE attributes (user decision "Accept + limit", section "NVS persistence"). Depends on 015. Model: **sonnet** (pure logic + host tests + esp_matter glue). After the task: `build-verifier`, then the **one** `firmware-reviewer` review of the phase-2a feature (015 + 016); text-only fixes get no re-review (S3).
 
 ## Goal
 EP1 attributes follow a simulated `reg_model` through a pure, host-tested read mapping. The bridge reads the model only through one snapshot getter, so phase 2b swaps the source (bus) without touching mapping or bridge. The whole mapping is **PROVISIONAL**: 233 values 3/5, 231 vs 008 and every starred register wait for the probe log.
