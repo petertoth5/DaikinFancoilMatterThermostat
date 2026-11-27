@@ -2,7 +2,7 @@
 title: N420384A Modbus RTU installation manual (file 2)
 type: source
 sources: ["EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-08
+updated: 2026-11-27
 ---
 
 # N420384A – same manual, second file
@@ -15,8 +15,8 @@ updated: 2026-11-08
 - Adds legend entry **S1 – Grid safety microswitch** (p2); BO/CH called "consent output" (file 1: "contact output") (p2).
 - Does **not** state the 500 m / 50 units limits (p3): both sentences are omitted (re-checked 2026-11-08).
 - Reg 218/219 descriptions shortened ("Minimum water for heating" / "Maximum water for cooling", missing "temperature").
-- p6 FLAG 7 key wording "SET+ e SET-" (Italian "e" = and, inferred) (`datasheet-reader`, 2026-11-08) → [[concepts/web-restriction-flags]].
-- Same as file 1 (not a difference): FLAG 1 printed "(247.0)", p3 "A A B B -" block layout and serial settings (2026-11-08).
+- p6 **FLAG 4** effect text reads "Pressing the SET+ **e** SET- keys" (file 1: "SET+ and SET-"; Italian "e" = and, inferred) (`datasheet-reader`, p6 image, 2026-11-27) → [[concepts/web-restriction-flags]]. *Correction 2026-11-27:* the 2026-11-08 entry attributed this wording to FLAG 7; FLAG 7 is identical in both files ("⏻ and SET+ keys for 5 sec."; "Condition: FLAG 1…6=1 ⏻ and SET+ keys pressed for at least 5 seconds"; "Action: FLAG 7=1 inhibition of FLAGS 1/6 for 1 hour").
+- Same as file 1 (not a difference): FLAG 1 printed "(247.0)" (re-confirmed on the p6 image 2026-11-27), p3 "A A B B -" block layout and serial settings (2026-11-08). 2026-11-27 re-check: p6 image-verified, pp. 3–4 text layer only.
 - p4 intro reads "INN-FR-B32 **e** EKWHCTRL0 board" (file 1: "and") (pdftotext check, 2026-11-07).
 - Contains leftover Italian text: p2 bullet "collegarsi al connettore ModBus con serigrafia presente sulla scheda"; p3 "parità=nessuna" (file 1: "parity=none"); "stop bit" (visually verified 2026-11-07).
 

@@ -2,12 +2,12 @@
 title: Modbus RTU / RS485 link
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf", "MAX485-M_EN_10035508.pdf"]
-updated: 2026-11-08
+updated: 2026-11-27
 ---
 
 # Modbus RTU / RS485 link
 
-**Protocol:** Modicon Modbus RTU, 9600 baud, 8 data bits, no parity, 1 stop bit (8N1). Function codes: **03** read single register, **06** write single register ([[sources/n420384a-english]] p3: baudrate=9600, data bits=8, parity=none, stop bit=1; functions "03" and "06" "for read and write of a single register"; file 2 prints "parità=nessuna"). Only these two are documented; nothing else is listed. Whether FC03 accepts quantity > 1 is not stated (phase-1 test). The manual does not name the port these settings apply to (visually re-checked by `datasheet-reader`, 2026-11-08).
+**Protocol:** Modicon Modbus RTU, 9600 baud, 8 data bits, no parity, 1 stop bit (8N1). Function codes: **03** read single register, **06** write single register ([[sources/n420384a-english]] p3: baudrate=9600, data bits=8, parity=none, stop bit=1; file 2 prints "parità=nessuna"). Exact p3 wording (file 1, image-verified by `datasheet-reader` 2026-11-27): "The implemented functions are: "03" and "06" respectively for the reading and writing of a single register". Only these two are documented; **FC16 (write multiple) is not mentioned**. Whether FC03 accepts quantity > 1 is not stated (phase-1 test). The "Serial Port Features" section names **no terminal**; linking these settings to the EKWHCTRL1 "A A B B -" block is *inferred* via the p3 legend "A – ModBus RTU Serial Connection" (visually re-checked 2026-11-08 and 2026-11-27; file 2 p3 text layer only on 2026-11-27).
 
 **Wiring (p3):** shielded bipolar RS485 cable, ≥0.35 mm²; keep separate from power cables; shortest leads; terminate the line with **120 Ω**; **no star topology**. Max 500 m total and 50 units per wall panel (stated only in [[sources/n420384a-english]]). "Complete the line with the 120 Ω resistance" and "It is forbidden make "star" connections" are in both files (p3, visually verified).
 **Ambiguity – which port these cabling rules apply to (2026-11-08, `datasheet-reader`, p3 at 600 dpi):** the manual does not say whether they cover the EKWHCTRL1 "+ A B -" fancoil chain, the "A A B B -" Modbus RTU port, or both. The only drawn 120 Ω and the "RS485" dashed chain are on the fancoil link (board 1 -> board 2), not on "A A B B -" ([[entities/ekwhctrl1]]). "50 units ... to each wall panel" reads like the fancoil chain *(inferred)*. So these rules are not confirmed for the node's "A A B B -" segment; termination there is a phase-1 check ([[concepts/bus-topology]] item 3).

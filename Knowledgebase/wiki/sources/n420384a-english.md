@@ -2,7 +2,7 @@
 title: N420384A Modbus RTU installation manual (file 1)
 type: source
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf"]
-updated: 2026-11-08
+updated: 2026-11-27
 ---
 
 # N420384A – Installation, connection and settings, wall control EKWHCTRL1 / EKRTCTRL1 for Modbus RTU
@@ -33,3 +33,8 @@ updated: 2026-11-08
 - p3: only drawn 120 Ω and the "RS485" chain are on the fancoil link; cabling rules do not name their port → [[concepts/modbus-rs485-link]].
 - No statement of master/slave role, timing, polling, broadcast, exception codes or write endurance for "A A B B -" → [[concepts/bus-topology]].
 - p4 register scope and star list → [[concepts/register-map]]; p5/p4 STAT bit 12 300 s timeout → [[concepts/flag-registers]]; p6 reg 247 persistence, FLAG 1 printed "(247.0)" (also in file 2) → [[concepts/web-restriction-flags]]; p6/p7 address procedure, [+]/[—] keys, "Address 001 – Leave free!" → [[concepts/device-addressing]].
+
+## 2026-11-27 re-check (`datasheet-reader`, pp. 3–7 rendered as images)
+- p3 FC wording quoted exactly; FC16 not mentioned; serial section names no terminal → [[concepts/modbus-rs485-link]].
+- p4 Note 2 (231), 233 "0/3 (inv)/5 (est)", p5 PRG legend incl. "Sutomatic" → [[concepts/register-map]].
+- p6 FLAG 0 / 4 / 5 / 7 exact wording, "FLAG n (247.n)" labels (bit numbering inferred), FLAG 1 "(247.0)" confirmed, persistence sentence → [[concepts/web-restriction-flags]].

@@ -2,6 +2,8 @@
 
 Status: spec ready. It implements the architect's console-write design of 2026-11-27 (W1-W14) with the user decisions of 2026-11-27, relayed by the orchestrator. W4 and W8 were changed by the user. wiki-keeper records the decisions in `concepts/firmware-architecture` section 6 (OS6).
 
+**See "Amendments 2026-11-27 (019a review)" at the end. It overrides the text above where they differ, and it adds a 019a fix-up (A6) that must land before the 019a commit.**
+
 Gate exception W2: this task is specified and built **before** the probe log and before the bus-topology answers. The bench runs with A/B open. The first real FC06 frame goes out on site in checklist section E. It is gated at run time (fresh OK reads, health ONLINE) and by checklist E.0. Depends on 006, 010, 011, 012, 013, 014. Bus-touching, so after 019b: `build-verifier`, then a **full independent `firmware-reviewer`** review of 019a + 019b together (S3).
 
 **Split (decided now):** two `firmware-dev` passes, two commits.
@@ -412,3 +414,54 @@ New **E. Control test** (after D.10, before D.11; same write image, no re-flash)
 3. 2b-C, the DE MCPWM check (Q-HW2), runs inside the same bench pass with a diagnostic build, not as a separate trip.
 4. Deployment hardware: the MAX3485 module, power and enclosure (BOM). After that, the production image is flashed once and the probe images retire.
 5. This is about 2-3 implementation passes and one more on-device flash after the trip.
+
+## Amendments 2026-11-27 (019a review)
+These are the architect's rulings on the deviations `firmware-dev` reported for 019a. Where they differ from the text above, they win.
+
+- **A1. Accessors.** `poll_sched_addr()` and `txn_log_res_name()` are accepted. They are read-only, pure, and needed so the code does not duplicate state or strings.
+- **A2. `write_guard_may_transmit(w, s)`** has no `now_ms`. Accepted. The deadline is enforced by the housekeeping in the same `write_guard_step` call, and nothing blocks between that and the call. The signature in 019a design 2 is changed to match.
+- **A3. Invalid arguments.** `write_guard_command` returns false with no event for season not in {0, 3, 5}, standby > 1 or fan > 3. This is accepted as defence in depth. The console stays the syntax gate. **019b:** the console rejects `sp` outside 5.0..40.0, more than one decimal, arm seconds outside 30..600 and `season` not in {0, 3, 5} with the usage text, and it never queues them (B.W.5 relies on this). A syntactically valid setpoint outside the live limits gives `W ... REFUSED sp limit <lo>-<hi>`.
+- **A4. Unreachable reasons are removed from WR11.**
+  - `REFUSED arm silence` is gone: a silence check leaves health STOPPED, so the reason is `health`.
+  - `REFUSED <cmd> budget` is gone: the 40th frame's command disarms, so a later command gets `disarmed`.
+  - 019b does not add them back. The `budget_left > 0` term in `may_transmit` stays as defence in depth.
+- **A5. Log format** is accepted as implemented, and the docs (019b) quote it exactly:
+  - registers as `%03u`;
+  - `limit <lo>-<hi>` in raw tenths, like `CMD sp <raw>`;
+  - `W <t> CMD restore` with no argument;
+  - `ABORTED <reg> <reason>`;
+  - `FAIL <reg> mismatch <hhhh>`;
+  - one FAIL line per command with the precedence write_ > verify_ > mismatch. The VERIFY value is still in the `T ... VERIFY` line.
+- **A6. Lost VERIFY. The reason split is confirmed. The mechanism must change: 019a fix-up, before the 019a commit.**
+  - Confirmed: no VERIFY, counted as `verify_lost` (a failure), when the disarm reason is `link`, `latched`, `poll_off`, `silence` or `addr`.
+    - After `mb poll off`, `mb silence` or the latch, the operator and D19/D21 expect no more TX.
+    - After a link fault, the port is closed.
+    - After `mb addr`, a VERIFY would read a different slave.
+    - The outcome is unknown, so it counts as a failure.
+  - Confirmed: the VERIFY still runs (WR5.6) after `user`, `timeout`, `budget`, `web_flags` and `health` (DEGRADED/OFFLINE). Polling and the offline probes keep sending FC03 in these states. The VERIFY is one FC03 at the normal gap, with no retry. It is the only evidence of what a sent FC06 did. No FC06 can go out in these states (`may_transmit`).
+  - **Change (bus safety must not depend on hook order).** Right now TX is suppressed only when a hook passes a bus-gone reason. `housekeeping` maps STOPPED to `health` and returns early once disarmed. So "user disarm, then `mb poll off`" without the hook would send the VERIFY while STOPPED. Required:
+    1. `write_guard_step` starts no PRE, WRITE or VERIFY while `poll_sched_health` is STOPPED or LATCHED, whether armed or not. A pending VERIFY then ends as `verify_lost`, and a pending PRE/WRITE as ABORTED.
+    2. While armed, `housekeeping` maps STOPPED to the disarm reason `poll_off` and LATCHED to `latched`.
+    3. PRE captures the slave address. WRITE and VERIFY use that captured address. If `poll_sched_addr()` differs by then: no TX, ABORTED before the WRITE, `verify_lost` at the VERIFY.
+  - New host scenarios in `test_e2e_write.c`, with no hook called and a VERIFY pending (armed, and after a user disarm):
+    - `poll_sched_stop` -> no TX, `verify_lost`;
+    - `poll_sched_latch` -> no TX, `verify_lost`;
+    - `poll_sched_set_addr` -> no frame to either address, `verify_lost`;
+    - DEGRADED -> the VERIFY runs.
+  - New mutation proof: removing check 1 makes a test fail.
+  - Files: `write_guard/src/write_guard.c`, `write_guard/include/write_guard.h` (only if the state struct needs the address) and `test_e2e_write.c`. `build-verifier` re-runs 019a. Report the new test count.
+  - **019b hooks** call `write_guard_disarm` *before* the action takes effect, and also when already disarmed (a VERIFY may be pending):
+    - `command_poll_off` before `poll_sched_stop`;
+    - `command_silence` before `poll_sched_stop` / `mb_link_deinit`;
+    - `command_addr` before `poll_sched_set_addr`;
+    - `latch()` and `track_link_faults` on entry.
+  - **Docs (019b):** state in the checklist that `mb write disarm` stops writes but not reads, and that `mb poll off` stops all TX. A command in flight then counts `verify_lost`.
+- **A7. Restore** is accepted as implemented:
+  - a fresh register equal to the stored value is skipped silently (no PRE, no pacing);
+  - a non-fresh register goes through PRE (SKIP if equal);
+  - if nothing differs, only the `CMD restore` line is printed;
+  - a refused sub-step prints `REFUSED restore <reason>` and ends the restore.
+  - E.7 confirms the result with `mb regs`. The docs say this.
+- **A8. Flag-4 upper clamp.** Accepted: the low end is tested only. 203 cannot exceed 350 raw without being `out_of_range` (not fresh OK). The clamp code stays as defence in depth.
+- **A9. Lint scope of the function-code literals.** Accepted as implemented: 0x05/0x06/0x0F/0x10/0x15-0x17/0x86 are banned in `components/mb_rtu/`, `components/mb_link/` (including `mb_link_write.c`) and `components/rs485_port/`. Only the two defines in `mb_rtu_write.c` are allowed. "Anywhere" in WR/acceptance 3 is replaced by this scope. Reason: 0x10 is a common non-FC literal elsewhere, and frames can only be built in these components (the R1-R9 call-site rules).
+- **A10. `firmware/README.md`** is added to the 019b files allowed to change. Only these parts may change: the build variants and write build command, lint R7-R9, the ELF `--mode read|write`, and the write-image console commands. Each part must match the implementation.

@@ -2,14 +2,14 @@
 title: Modbus register map
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-08
+updated: 2026-11-27
 ---
 
 # Register map
 
 Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-modbus-rtu]]; wording differences listed on that source page). Addresses are decimal. "mlt" = multiplier: raw × mlt = value (0.1 → tenths of unit). Limits must be respected. `*` = only on [[entities/inn-fr-b32]] board.
 
-**Scope and star list (`datasheet-reader`, both files, pages rendered as images, 2026-11-08):** p4 intro: "addresses of the control parameters resident on the INN-FR-B32 and EKWHCTRL0 board and the EKRTCTRL1 and EKWHCTRL1 wall-mounted control panel" (file 2: "INN-FR-B32 e EKWHCTRL0"). p4 also: "The limit values must be respected!" and "take into account the multiplication factor mlt during reading". Starred "* Only for INN-FR-B32 board": 001, 009, 015, 104, 210, 211, 212, 213, 214, 215, 218, 219, 243, 244. Unstarred: 000, 008, 105, 200, 201, 202, 203, 209, 221, 222, 230, 231, 233, 234, 242, 245, 246, 247. The table below matches this list (checked 2026-11-08, no mismatch).
+**Scope and star list (`datasheet-reader`, both files, pages rendered as images, 2026-11-08; file 1 pp. 4–5 re-checked on the image 2026-11-27, file 2 p4 text layer only):** p4 intro: "addresses of the control parameters resident on the INN-FR-B32 and EKWHCTRL0 board and the EKRTCTRL1 and EKWHCTRL1 wall-mounted control panel" (file 2: "INN-FR-B32 e EKWHCTRL0"). p4 also: "The limit values must be respected!" and "take into account the multiplication factor mlt during reading". Starred "* Only for INN-FR-B32 board": 001, 009, 015, 104, 210, 211, 212, 213, 214, 215, 218, 219, 243, 244. Unstarred: 000, 008, 105, 200, 201, 202, 203, 209, 221, 222, 230, 231, 233, 234, 242, 245, 246, 247. The table below matches this list (checked 2026-11-08, no mismatch).
 - 230 MVVP3 and 234 MVVP2 are printed **unstarred** while 210–215 (incl. MVVP1 215) are starred; looks inconsistent, recorded as printed.
 - Not stated whether the panel proxies starred registers. *(Inferred:)* via EKWHCTRL1 "A A B B -" only unstarred registers are reliable; starred ones may be absent or return an exception; test in phase 1 ([[concepts/bus-topology]] item 4).
 
@@ -23,7 +23,7 @@ Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-
 | 104* | STAT | – | Status flags | R | flag | – |
 | 105 | ALR_STAT | – | Alarm flags | R | flag | – |
 | 200 | ADR | 1–255 | Device address | R/W | 1 | 1 |
-| 201 | PRG | – | Mode/standby/lock flags | R/W | flag | 0 |
+| 201 | PRG | – | "Flag configuration" (mode/standby/lock) | R/W | flag | 0 |
 | 202 | SPL | 5.0–SPH °C | Min setpoint | R/W | 0.1 | 16.0 |
 | 203 | SPH | SPL–35.0 °C | Max setpoint | R/W | 0.1 | 28.0 |
 | 209 | E_SAVING | 0–8.5 K | Presence-contact offset / standby | R/W | 0.1 | 0 |
@@ -39,8 +39,8 @@ Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-
 | 219* | LHI | 0–100.0 °C | Max water temp for cooling | R/W | 0.1 | 20.0 |
 | 221 | ACL | 0–32000 h | Maintenance interval (0 = off) | R/W | 1 | 0 |
 | 222 | ACL_TIM | 0–ACL | Fan running hours | R/W | 1 | – |
-| 231 | SP | SPL–SHP / SPL_W–SPH_W | Absolute setpoint (5–40 °C) | R/W | 0.1 | 20.0 |
-| 233 | Man | 0 / 3 (winter) / 5 (summer) | Seasonal auto/manual | R/W | 1 | 3 |
+| 231 | SP | SPL–SHP / SPL_W–SPH_W | Absolute setpoint value (Note 2) | R/W | 0.1 | 20.0 |
+| 233 | Man | printed "0/3 (inv)/5 (est)" | "Seasonal auto/manual" | R/W | 1 | 3 |
 | 242 | OS1 | ±12.0 K | T1 air probe offset | R/W | 0.1 | 0 |
 | 243* | OS2 | ±12.0 K | H2 probe offset | R/W | 0.1 | 0 |
 | 244* | OS3 | ±12.0 K | H4 probe offset | R/W | 0.1 | 0 |
@@ -50,9 +50,11 @@ Source: [[sources/n420384a-english]] p4 (values identical in [[sources/n420384a-
 
 ## Notes / source quirks
 - Writing the setpoint: p6 "To enter the setpoint, write the absolute value within the selected scale in register 231 SP."; 008 is the read-only real setpoint.
-- PRG 201 bits 8–15: "System Flags reserved, do not change the status" (p5, [[concepts/flag-registers]]).
+- PRG 201 legend (p5, image-verified 2026-11-27): "PRG: 000=Sutomatic; 001=Silent; 010=Night; 011=Maximum" (printed typo "Sutomatic"), LOCK, Stby; bits 3, 5, 6 printed "-" with no legend; "8-15: System Flags reserved, do not change the status" ([[concepts/flag-registers]]).
+- Reg 231 Note 2 (p4): "Absolute setpoint value from 5 to 40. For the setpoint, write the value within the selected scale." Behaviour on an out-of-range write (refused, clamped, exception?) is **not stated**.
+- Reg 233 printed "0/3 (inv)/5 (est)", description "Seasonal auto/manual", default 3. The meaning of **0 is not stated**; 0 = seasonal auto (and 3/5 = manual winter/summer) is *inferred* from the description.
 - Reg 218/219: file 2 descriptions omit "temperature" ("Minimum water for heating" / "Maximum water for cooling") ([[sources/n420384a-modbus-rtu]]).
-- Reg 233 labels "inv"/"est" are Italian (inverno = winter, est**ate** = summer) *(inferred)*.
+- Reg 233 labels "inv"/"est" read as Italian (inverno = winter, est**ate** = summer) *(inferred)*.
 - Limits column shows "SHP" for 231 and "SPH" elsewhere; likely a typo for SPH *(inferred)*.
 - MVV limit for 210 prints "MVV3-4" (unclear whether minus 4 or MVV3/MVV4).
 - Registers 210–219 hold fan RPM-like values, unit not stated.
