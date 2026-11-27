@@ -13,6 +13,7 @@ Target MCU module for the Matter thermostat ([[sources/project-brief]]), on the 
 - The project brief names the board "ESP32-S3-WROOM-1-N16R8-M" ([[sources/project-brief]]).
 - The module datasheet's ordering code is **ESP32-S3-WROOM-1-N16R8**; "-M" appears in neither raw document ([[sources/esp32-s3-wroom-1-datasheet]] PDF p4 Table 1; [[sources/yd-esp32-s3-coreboard-schematic]] p2, U4 labelled "ESP32-S3-WROOM-1").
 - "-M" is probably part of the dev-board / shop name *(inferred)*; not resolved. The page file name is kept.
+- Data point (user observation 2026-11-28, physical board, not in raw): the name printed on the PCB is **"ESP32-S3-N16R8"**, without "-M" (and not "YD-ESP32-S3-COREBOARD", see [[entities/yd-esp32-s3-coreboard]]). The brief's "-M" therefore appears neither on the board print nor in raw; conflict left open.
 
 ## Variant facts (datasheet, PDF p4 Table 1 and footnotes)
 - 16 MB Quad SPI flash + 8 MB Octal SPI PSRAM (in-package); flash max 80 MHz by default; flash > 100 000 P/E cycles, > 20 years retention.

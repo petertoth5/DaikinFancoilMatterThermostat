@@ -9,6 +9,8 @@ updated: 2026-11-28
 
 Dev board (VCC-GND studio, schematic dated 2022/6/1, revision "*") carrying the [[entities/esp32-s3-wroom-1]] module ([[sources/yd-esp32-s3-coreboard-schematic]] p2). **Identity inferred:** the user's board was bought as Hestore 10048120 and both raw files carry that number; the board itself has not been checked against this schematic. The project brief calls the board "ESP32-S3-WROOM-1-N16R8-M" ([[sources/project-brief]]); "-M" is not in either raw document (see [[entities/esp32-s3-wroom-1]]).
 
+**Printed board name (user observation 2026-11-28, physical board, not in raw):** the PCB reads **"ESP32-S3-N16R8"**. It does **not** say "YD-ESP32-S3-COREBOARD" and has **no "-M" suffix**. This neither confirms nor contradicts the schematic match *(neutral)*. The identity stays **inferred**, resting on the shared Hestore number 10048120 plus the observations consistent with the schematic: empty "IN-OUT" bridge, USB-C labels "COM" / "USB", CH343 console on `/dev/ttyACM0` (see Connectors and Power path).
+
 ## Connectors (schematic p2)
 - **USB1 = UART port** via CH343P (U2) -> UART0 (U0TXD/U0RXD = GPIO43/44); RTS/DTR auto-program circuit to CHIP_PU and GPIO0. The CH343P is powered only from USB1. This is the port used on the bench and for `/dev/ttyACM0` (bench power "PC USB on the CH343 UART port only", user 2026-11-27, [[concepts/firmware-architecture]] section 4).
 - **USB2 = native USB** of the ESP32-S3 (GPIO19 D−, GPIO20 D+).
@@ -35,5 +37,5 @@ Dev board (VCC-GND studio, schematic dated 2022/6/1, revision "*") carrying the 
 ## Open questions
 - ~~Is the "IN-OUT" 0 Ω link populated?~~ Answered 2026-11-28: empty (user). Is "USB-OTG" populated? (not asked)
 - ~~Which physical connector is USB1 vs USB2, and their labels?~~ Answered 2026-11-28: "COM" / "USB" (user); mapping inferred, see Connectors.
-- Board identity and revision (schematic revision "*") are not confirmed on the board; the board name printed on the PCB is unknown to the user (2026-11-28, low priority).
+- Board identity and revision (schematic revision "*") are not confirmed on the board. ~~The board name printed on the PCB is unknown to the user (2026-11-28, low priority).~~ Answered 2026-11-28: "ESP32-S3-N16R8" (user); no "YD-ESP32-S3-COREBOARD", no "-M". Identity remains inferred (see top).
 - Not stated: D26 diode type / drop, AMS1117 current, 3V3 pin budget, J1-21 input voltage range, board dimensions / mounting holes.

@@ -496,3 +496,9 @@ No raw files added or changed. Source: user observation of the physical board, s
 - concepts/firmware-architecture s4 bench wiring: confirmation added; s8 bench-power item closed (explained by user observation + schematic). s8 GPIO4/5/6 reset pull state item unchanged (series datasheet skipped by the user for now).
 - concepts/dev-environment: flashing note on the connector labels (COM = CH343 port); front matter sources += the schematic file.
 - index.md: yd-esp32-s3-coreboard and esp32-s3-wroom-1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | user board observation: PCB print "ESP32-S3-N16R8"
+No raw files added or changed. Source: user observation of the physical board, session 2026-11-28 (not in raw), relayed by the orchestrator.
+- entities/yd-esp32-s3-coreboard: printed board name "ESP32-S3-N16R8" recorded (not "YD-ESP32-S3-COREBOARD", no "-M"); neutral evidence, board identity stays inferred (Hestore 10048120 + empty IN-OUT bridge, COM/USB labels, CH343 console). Open question "board name printed" answered.
+- entities/esp32-s3-wroom-1: "-M" section gets the data point (no "-M" on the PCB print); conflict with the project brief left open.
+- index.md: yd-esp32-s3-coreboard and esp32-s3-wroom-1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
