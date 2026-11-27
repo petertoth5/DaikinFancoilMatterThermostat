@@ -42,6 +42,9 @@ Copy this file, fill it in, and save it with the complete serial output as descr
 | `B13.result` pending read cancelled (no `MANUAL 000` line) y/n | | |
 | `B14.result` latched run (lines, refusals, DE low) or "not done" | | |
 | `B15.*` port-fault line(s) and `mb status` before/after, if any | | |
+| `B16.activity` B.16 RO direct: boot silence activity per boot (latch: reboot, at most 2 repeats; e.g. `1, 0`) | | count |
+| `B16.results` B.16: all `T` lines TIMEOUT y/n; any BADFRAME y/n (STOP if y) | | |
+| `B16.gap` B.16 `gap_bytes` (> 0: STOP, back to the architect) | | bytes |
 
 ### B.5 silence cycles
 
@@ -101,6 +104,7 @@ Indirect evidence (multimeter DC readings average the level; they cannot show a 
 | `C4.skip` readings skipped (A.4) y/n, node GND left unconnected | | |
 | `C5.addr` address shown on the panel | | |
 | `D2.activity` boot silence activity on the real bus | | count |
+| `D2a.ab_idle` (optional, A.4 conditions) A-B DC at the panel after a clean boot; >= 0.2 V = panel biases | | V |
 | `D5.*` `mb read 200 4`, `000 2`, `242 4`: result lines | | |
 | `D6.*` panel display anomalies when polled (e.g. WEB icon) | | |
 | `D9.*` panel/fancoil behaviour with polling off > 300 s, duration | | s |

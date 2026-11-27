@@ -38,7 +38,7 @@ Raw: `20261107_192127.jpg` — user photo, 1949x1259 JPEG, added 2026-11-07. Fac
 - Right header and screw-terminal labels; R5/R6/R8 codes (low confidence or illegible); underside of the board.
 - Closed 2026-11-27 by measurement: R7 role (120 Ω termination); A–VCC 20 kΩ / B–GND 10 kΩ show a bias network (topology *inferred*) ([[entities/max485]]).
 - Does D1 light when powered?
-- Module to be replaced by a MAX3485 module for on site (user decision 2026-11-27, [[entities/max485]]).
+- Module to be replaced by a MAX3485 module for on site (user decision 2026-11-27, [[entities/max485]]); amended later 2026-11-27: used for the on-site phase-1 run, MAX3485 for deployment ([[entities/max485]]).
 
 ## Related
 [[entities/max485]], [[concepts/bus-topology]], [[sources/max485-datasheet]].
