@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bus-access lint (rules R1-R8, tasks 001 and 013, architecture section 3).
+"""Bus-access lint (rules R1-R9, tasks 001, 013 and 019a, architecture section 3).
 
 Scans *.c *.h *.cpp *.cc *.cxx *.hpp *.hh *.S and files named exactly idf_component.yml
 (only R3 applies to those) under main/ and components/ (paths relative to firmware/).
@@ -18,8 +18,11 @@ matching (not in manifests). Output: path:line: R<n>: message, exit 1.
   R5  UART setup (driver install/config/pin/mode/baud/parity/flow control/ISR/flush ...) only
       in components/rs485_port/, uart_set_mode only with allowed modes
   R6  CONFIG_DMT_BUS_TX/DE_GPIO only in components/rs485_port/ and main/
-  R7  mb_link_write* only in mb_link_write.c/.h
-  R8  function-code bytes only in mb_rtu and only 0x03 (read holding registers)
+  R7  mb_link_write* only in mb_link_write.c/.h and components/bus_task/src/bus_write.c
+  R8  function-code bytes only in mb_rtu: 0x03/0x83 (read) as the two defines in mb_rtu.c,
+      0x06/0x86 (write single register) as the two defines in mb_rtu_write.c, nothing else
+  R9  FC06 codec names (mb_rtu_build_fc06, mb_rtu_parse_fc06, mb_rtu_fc06_*) only in
+      mb_rtu_write.c/.h and mb_link_write.c
 
 Documented limits (not detected): `#include MACRO`, `##` token pasting, decimal, octal and
 binary function-code literals, function codes computed at run time or passed through
@@ -71,9 +74,13 @@ RE_BUILD_DIR = re.compile(r"build(?:[-_].*)?")
 
 WRITE_FILE = "components/mb_link/src/mb_link_write.c"
 WRITE_HEADER = "components/mb_link/include/mb_link_write.h"
+BUS_WRITE_FILE = "components/bus_task/src/bus_write.c"
+MB_RTU_WRITE_HEADER = "components/mb_rtu/include/mb_rtu_write.h"
 RS485_PORT = "components/rs485_port/"
 RS485_PORT_SRC = "components/rs485_port/src/"
 MB_RTU_SRC = "components/mb_rtu/src/"
+MB_RTU_C = "components/mb_rtu/src/mb_rtu.c"
+MB_RTU_WRITE_C = "components/mb_rtu/src/mb_rtu_write.c"
 # R8 (c)/(d): the components where function-code bytes must not appear.
 FC_COMPONENTS = ("components/mb_rtu/", "components/mb_link/", RS485_PORT)
 # R8 (d): simple assignment to a function-code field is banned only here (mb_rtu parses frames).
@@ -81,13 +88,14 @@ FC_SIMPLE_ASSIGN_COMPONENTS = ("components/mb_link/", RS485_PORT)
 
 UART_MODE_ALLOWED_ARGS = ("UART_MODE_RS485_HALF_DUPLEX", "UART_MODE_UART")
 UART_WRITE_ALLOWED = "uart_write_bytes"
-# The only MB_RTU_FC_* names, with the literal their #define must have (Modbus FC03 / exception 0x83).
-FC_DEFINE_LITERALS = {
-    "MB_RTU_FC_READ_HOLDING": "0x03",
-    "MB_RTU_FC_READ_HOLDING_EXC": "0x83",
+# The only MB_RTU_FC_* names, per file, with the literal their #define must have
+# (Modbus FC03 / exception 0x83 in mb_rtu.c, FC06 / exception 0x86 in mb_rtu_write.c).
+FC_DEFINE_LITERALS_BY_FILE = {
+    MB_RTU_C: {"MB_RTU_FC_READ_HOLDING": "0x03", "MB_RTU_FC_READ_HOLDING_EXC": "0x83"},
+    MB_RTU_WRITE_C: {"MB_RTU_FC_WRITE_SINGLE": "0x06", "MB_RTU_FC_WRITE_SINGLE_EXC": "0x86"},
 }
 READ_FC_VALUES = (0x03, 0x83)
-WRITE_FC_VALUES = (0x05, 0x06, 0x0F, 0x10, 0x15, 0x16, 0x17)
+WRITE_FC_VALUES = (0x05, 0x06, 0x0F, 0x10, 0x15, 0x16, 0x17, 0x86)
 
 RE_MASTER = re.compile(r"\bmbc_(?!slave_|tcp_)\w*|\bmbm_\w*")
 RE_SLAVE = re.compile(r"\b(?:mbc_slave_\w*|mbs_\w*|mbc_tcp_\w*)")
@@ -122,6 +130,7 @@ RE_UART_SETUP = re.compile(
 RE_UART_SET_MODE = re.compile(r"\buart_set_mode\s*\(")
 RE_GPIO_CFG = re.compile(r"CONFIG_DMT_BUS_(?:TX|DE)_GPIO")
 RE_LINK_WRITE = re.compile(r"\bmb_link_write\w*")
+RE_FC06_CODEC = re.compile(r"\bmb_rtu_(?:build_fc06|parse_fc06|fc06_)\w*")
 RE_MB_FUNC = re.compile(r"\bMB_FUNC_\w*")
 RE_RTU_FC_NAME = re.compile(r"\bMB_RTU_FC_\w*")
 # #define of an MB_RTU_FC_* name; group 2 is the value when it is a lone hex literal (optional
@@ -242,21 +251,22 @@ def _check_r6(path, text):
 
 
 def _check_r7(path, text):
-    if path in (WRITE_FILE, WRITE_HEADER):
+    if path in (WRITE_FILE, WRITE_HEADER, BUS_WRITE_FILE):
         return
     for m in RE_LINK_WRITE.finditer(text):
-        yield m.start(), "R7", f"{m.group()} only allowed in {WRITE_FILE} and {WRITE_HEADER}"
+        yield m.start(), "R7", f"{m.group()} only allowed in {WRITE_FILE}, {WRITE_HEADER} and {BUS_WRITE_FILE}"
 
 
 def _check_r8_names(path, text):
     """R8 (a) and (b): esp-modbus FC constants and the MB_RTU_FC_* names."""
     for m in RE_MB_FUNC.finditer(text):
         yield m.start(), "R8", f"{m.group()} (esp-modbus function code) is banned"
+    allowed = FC_DEFINE_LITERALS_BY_FILE.get(path, {})
     for m in RE_RTU_FC_NAME.finditer(text):
         if not path.startswith(MB_RTU_SRC):
             yield m.start(), "R8", f"{m.group()} only allowed in {MB_RTU_SRC}"
-        elif m.group() not in FC_DEFINE_LITERALS:
-            yield m.start(), "R8", f"{m.group()} is not an allowed function-code name"
+        elif m.group() not in allowed:
+            yield m.start(), "R8", f"{m.group()} is not an allowed function-code name in {path}"
 
 
 def _check_r8_defines(path, text):
@@ -266,18 +276,24 @@ def _check_r8_defines(path, text):
     0x03/0x83 literals R8 (c) lets through.
     """
     violations, accepted = [], set()
-    if not path.startswith(MB_RTU_SRC):
-        return violations, accepted
+    allowed = FC_DEFINE_LITERALS_BY_FILE.get(path, {})
     for m in RE_FC_DEFINE.finditer(text):
         name, value = m.group(1), m.group(2)
-        if name not in FC_DEFINE_LITERALS:
+        if name not in allowed:
             continue  # reported by the name check
-        expected = FC_DEFINE_LITERALS[name]
+        expected = allowed[name]
         if value is None or value.lower().rstrip("u") != expected:
             violations.append((m.start(), "R8", f"{name} must be defined as literal {expected}"))
         else:
             accepted.add(m.start(2))
     return violations, accepted
+
+
+def _check_r9(path, text):
+    if path in (MB_RTU_WRITE_C, MB_RTU_WRITE_HEADER, WRITE_FILE):
+        return
+    for m in RE_FC06_CODEC.finditer(text):
+        yield m.start(), "R9", f"{m.group()} only allowed in {MB_RTU_WRITE_C}, {MB_RTU_WRITE_HEADER} and {WRITE_FILE}"
 
 
 def _check_r8_literals(text, accepted_offsets):
@@ -314,7 +330,7 @@ def _check_r8(path, text):
 
 
 CHECKS = (_check_r1, _check_r2, _check_r3, _check_r4,
-          _check_r5, _check_r6, _check_r7, _check_r8)
+          _check_r5, _check_r6, _check_r7, _check_r8, _check_r9)
 MANIFEST_CHECKS = (_check_r3,)
 
 
@@ -370,7 +386,6 @@ def scan_tree(root):
 
 
 MB_LINK_C = "components/mb_link/src/mb_link.c"
-MB_RTU_C = "components/mb_rtu/src/mb_rtu.c"
 RS485_C = "components/rs485_port/src/rs485_port.c"
 RD_C = "components/daikin_regs/src/daikin_regs.c"
 MB_LINK_YML = "components/mb_link/idf_component.yml"
@@ -481,6 +496,40 @@ SELF_TEST_CASES = (
     ("components/mb_link/include/mb_link_write.h", "int mb_link_write(int a);", set()),
     (MB_LINK_C, "mb_link_write(1, 2, 3);", {"R7"}),
     (MAIN_C, "mb_link_write_reg(1);", {"R7"}),
+    (BUS_WRITE_FILE, "mb_link_write(1, 231, 215, &exc);", set()),
+    ("components/bus_task/src/bus_write.h", "mb_link_write(1, 231, 215, &exc);", {"R7"}),
+    ("components/bus_task/src/mb_console.c", "mb_link_write(1, 231, 215, &exc);", {"R7"}),
+    ("components/bus_task/src/bus_task.c", "mb_link_write_x();", {"R7"}),
+    # R9: FC06 codec names only in mb_rtu_write.c/.h and mb_link_write.c
+    (MB_RTU_WRITE_C, "int n = mb_rtu_build_fc06(a, r, v, o); mb_rtu_parse_fc06_reply(q, x, l, &e); mb_rtu_fc06_reply_len(x, n);", set()),
+    (MB_RTU_WRITE_HEADER, "int mb_rtu_build_fc06(uint8_t a, uint16_t r, uint16_t v, uint8_t o[8]);", set()),
+    (WRITE_FILE, "mb_rtu_build_fc06(a, r, v, o); mb_rtu_parse_fc06_reply(q, x, l, &e); mb_rtu_fc06_reply_len(x, n);", set()),
+    ("components/bus_task/src/bus_task.c", "mb_rtu_build_fc06(a, r, v, o);", {"R9"}),
+    ("components/bus_task/src/bus_write.c", "mb_rtu_parse_fc06_reply(q, x, l, &e);", {"R9"}),
+    (WRITE_HEADER, "mb_rtu_fc06_reply_len(x, n);", {"R9"}),
+    (MB_LINK_C, "mb_rtu_build_fc06(a, r, v, o);", {"R9"}),
+    (MAIN_C, "mb_rtu_fc06_x();", {"R9"}),
+    (MAIN_C, "mb_rtu_build_fc03(1, 0, 1, b); mb_rtu_parse_fc03_reply(1, 1, r, n, v, &e);", set()),
+    # R8 (b) for the write codec: its own two defines only, in mb_rtu_write.c only
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u\n#define MB_RTU_FC_WRITE_SINGLE_EXC 0x86u", set()),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u\nf[1] = MB_RTU_FC_WRITE_SINGLE; if (r[1] == MB_RTU_FC_WRITE_SINGLE_EXC) {}", set()),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE 0x07u", {"R8"}),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE_EXC 0x06u", {"R8"}),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u\nx = 0x06u;", {"R8"}),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE_EXC 0x86u\nx = 0x86;", {"R8"}),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_READ_HOLDING 0x03u", {"R8"}),
+    (MB_RTU_WRITE_C, "x = 0x10;", {"R8"}),
+    (MB_RTU_WRITE_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u\n#define MB_RTU_FC_WRITE_MULTI 0x10u", {"R8"}),
+    (MB_RTU_C, "#define MB_RTU_FC_WRITE_SINGLE 0x06u", {"R8"}),
+    (MB_RTU_C, "x = MB_RTU_FC_WRITE_SINGLE_EXC;", {"R8"}),
+    ("components/mb_rtu/include/mb_rtu_write.h", "#define MB_RTU_FC_WRITE_SINGLE 0x06u", {"R8"}),
+    (MB_LINK_C, "x = MB_RTU_FC_WRITE_SINGLE;", {"R8"}),
+    (WRITE_FILE, "b = 0x06;", {"R8"}),
+    (WRITE_FILE, "b = 0x86;", {"R8"}),
+    (WRITE_FILE, "b = 0x10;", {"R8"}),
+    (MB_LINK_C, "b = 0x10;", {"R8"}),
+    (RS485_C, "b = 0x86;", {"R8"}),
+    (MB_RTU_C, "b = 0x10;", {"R8"}),
     # R8 (a): esp-modbus constants anywhere
     (MB_LINK_C, "x = MB_FUNC_READ_HOLDING_REGISTER;", {"R8"}),
     (MAIN_C, "x = MB_FUNC_WRITE_SINGLE_REGISTER;", {"R8"}),

@@ -16,7 +16,7 @@
 #define HEX_BYTE_DIGITS  2u
 
 /* Indexed by the enum values; the order is part of the format. */
-static const char *const KIND_NAMES[] = { "POLL", "RETRY", "HEALTH", "SWEEP", "MANUAL" };
+static const char *const KIND_NAMES[] = { "POLL", "RETRY", "HEALTH", "SWEEP", "MANUAL", "PRE", "WRITE", "VERIFY" };
 static const char *const RES_NAMES[] = { "OK", "TIMEOUT", "EXC", "BADFRAME", "ERROR" };
 static const char *const HEALTH_NAMES[] = { "STOPPED", "ONLINE", "DEGRADED", "OFFLINE", "LATCHED" };
 #define COUNT_OF(a) (sizeof(a) / sizeof((a)[0]))
@@ -73,6 +73,11 @@ size_t txn_log_format_txn(char *buf, size_t n, const ps_txn_t *t)
         put(&w, " %02x", (unsigned)t->exc_code);
     }
     return finish(&w);
+}
+
+const char *txn_log_res_name(ps_res_t res)
+{
+    return (unsigned)res < COUNT_OF(RES_NAMES) ? RES_NAMES[res] : "?";
 }
 
 size_t txn_log_format_health(char *buf, size_t n, int64_t t_ms, ps_health_t h)

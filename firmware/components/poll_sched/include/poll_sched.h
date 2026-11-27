@@ -12,7 +12,10 @@
 
 typedef enum { PS_STOPPED, PS_ONLINE, PS_DEGRADED, PS_OFFLINE, PS_LATCHED } ps_health_t;
 typedef enum { PS_RES_OK, PS_RES_TIMEOUT, PS_RES_EXCEPTION, PS_RES_BAD_FRAME, PS_RES_ERROR } ps_res_t;
-typedef enum { PS_KIND_POLL, PS_KIND_RETRY, PS_KIND_HEALTH, PS_KIND_SWEEP, PS_KIND_MANUAL } ps_kind_t;
+/* PRE, WRITE and VERIFY belong to a console write command (spec 019, write_guard): they only
+ * occupy the bus (statistics, gap) and change no health, schedule, retry or unsupported state. */
+typedef enum { PS_KIND_POLL, PS_KIND_RETRY, PS_KIND_HEALTH, PS_KIND_SWEEP, PS_KIND_MANUAL,
+               PS_KIND_PRE, PS_KIND_WRITE, PS_KIND_VERIFY } ps_kind_t;
 
 typedef struct { uint8_t addr; uint16_t reg, qty; ps_kind_t kind; } ps_req_t;
 typedef struct {
@@ -28,7 +31,7 @@ typedef struct {
 #define PS_LAT_BUCKETS   201          /* 0..2000 ms */
 typedef struct {
     uint32_t txns, ok, timeout, exception, bad_frame, error, retries, health_probes, sweeps, manual,
-             offline_entries;
+             offline_entries, pre, write, verify;
     uint32_t lat_min_ms, lat_max_ms, lat_hist[PS_LAT_BUCKETS];   /* answered transactions only (OK or EXCEPTION) */
 } ps_stats_t;
 
@@ -63,6 +66,9 @@ bool poll_sched_next(poll_sched_t *s, int64_t now_ms, ps_req_t *out, int64_t *wa
 void poll_sched_complete(poll_sched_t *s, const ps_txn_t *t);
 ps_health_t poll_sched_health(const poll_sched_t *s);
 bool poll_sched_is_unsupported(const poll_sched_t *s, uint16_t reg);
+uint8_t poll_sched_addr(const poll_sched_t *s);                 /* current slave address */
+/* Earliest start of the next transaction (end of the last one + gap, rule 2); INT64_MIN before the first. */
+int64_t poll_sched_ready_ms(const poll_sched_t *s);
 void poll_sched_get_stats(const poll_sched_t *s, ps_stats_t *out);
 uint32_t poll_sched_lat_median_ms(const ps_stats_t *st);       /* upper edge of the median bucket; 0 if no samples */
 

@@ -1,5 +1,6 @@
 /* test_txn_log.c - host Unity tests for txn_log (format v1). */
 
+#include <stdio.h>
 #include <string.h>
 #include "unity.h"
 #include "txn_log.h"
@@ -186,4 +187,49 @@ TEST_CASE("txn_log: out-of-range kind, result and health format to 0", "[txn_log
     memset(buf, 'x', sizeof(buf));
     TEST_ASSERT_EQUAL_UINT32(0, txn_log_format_health(buf, sizeof(buf), 1, (ps_health_t)99));
     TEST_ASSERT_EQUAL_CHAR('\0', buf[0]);
+}
+
+/* ---- write-sequence kinds (spec 019) ---- */
+
+TEST_CASE("txn_log: PRE, WRITE and VERIFY lines format and round-trip", "[txn_log]")
+{
+    static const struct { ps_kind_t kind; const char *name; } kinds[] = {
+        { PS_KIND_PRE, "PRE" }, { PS_KIND_WRITE, "WRITE" }, { PS_KIND_VERIFY, "VERIFY" },
+    };
+    for (size_t i = 0; i < sizeof(kinds) / sizeof(kinds[0]); i++) {
+        ps_txn_t t = make_txn(kinds[i].kind, 231, 1, PS_RES_OK);
+        t.val[0] = 0x00d7;
+        char expected[64], buf[160];
+        snprintf(expected, sizeof(expected), "T 120345 24 1 %s 231 1 OK 00d7", kinds[i].name);
+        assert_format(&t, expected);
+        tl_rec_t rec;
+        TEST_ASSERT_EQUAL_INT(1, txn_log_parse(expected, &rec));
+        TEST_ASSERT_EQUAL_INT(kinds[i].kind, rec.txn.req.kind);
+        TEST_ASSERT_EQUAL_HEX16(0x00d7, rec.txn.val[0]);
+        TEST_ASSERT_EQUAL_UINT32(strlen(expected), txn_log_format_txn(buf, sizeof(buf), &rec.txn));
+        TEST_ASSERT_EQUAL_STRING(expected, buf);
+    }
+    ps_txn_t w = make_txn(PS_KIND_WRITE, 201, 1, PS_RES_EXCEPTION);
+    w.exc_code = 3;
+    assert_format(&w, "T 120345 24 1 WRITE 201 1 EXC 03");
+    w = make_txn(PS_KIND_WRITE, 233, 1, PS_RES_TIMEOUT);
+    assert_format(&w, "T 120345 24 1 WRITE 233 1 TIMEOUT");
+}
+
+TEST_CASE("txn_log: W and A lines of the write guard are ignored", "[txn_log]")
+{
+    tl_rec_t rec;
+    TEST_ASSERT_EQUAL_INT(0, txn_log_parse("W 1000 DONE 231 00d2 -> 00d7 budget 39", &rec));
+    TEST_ASSERT_EQUAL_INT(0, txn_log_parse("A 1000 ARMED 120 s budget 40", &rec));
+    TEST_ASSERT_EQUAL_INT(0, txn_log_parse("W 1000 REFUSED sp disarmed\r\n", &rec));
+}
+
+TEST_CASE("txn_log: result names", "[txn_log]")
+{
+    TEST_ASSERT_EQUAL_STRING("OK", txn_log_res_name(PS_RES_OK));
+    TEST_ASSERT_EQUAL_STRING("TIMEOUT", txn_log_res_name(PS_RES_TIMEOUT));
+    TEST_ASSERT_EQUAL_STRING("EXC", txn_log_res_name(PS_RES_EXCEPTION));
+    TEST_ASSERT_EQUAL_STRING("BADFRAME", txn_log_res_name(PS_RES_BAD_FRAME));
+    TEST_ASSERT_EQUAL_STRING("ERROR", txn_log_res_name(PS_RES_ERROR));
+    TEST_ASSERT_EQUAL_STRING("?", txn_log_res_name((ps_res_t)99));
 }

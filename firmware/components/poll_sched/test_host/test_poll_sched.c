@@ -1363,3 +1363,59 @@ TEST_CASE("poll_step soak: 2 h mixed kinds keep the gap on every request", "[pol
     TEST_ASSERT_GREATER_OR_EQUAL_UINT32(1, st.offline_entries);
     TEST_ASSERT_TRUE(manual_in_outage);
 }
+
+/* ---- write-sequence kinds PRE, WRITE, VERIFY (spec 019) ---- */
+
+TEST_CASE("poll_sched: ready_ms is INT64_MIN before the first transaction, then end + gap", "[poll_sched]")
+{
+    setup_running(&(ps_config_t){ .addr = 7, .gap_ms = 100, .fast_ms = 5000, .slow_ms = 60000,
+                                  .offline_probe_ms = 30000, .retries = 1, .offline_after = 5 });
+    TEST_ASSERT_EQUAL_UINT8(7, poll_sched_addr(&S));
+    TEST_ASSERT_EQUAL_INT64(INT64_MIN, poll_sched_ready_ms(&S));
+    ps_req_t r = take();
+    finish(r, PS_RES_OK, 0, DUR);
+    TEST_ASSERT_EQUAL_INT64(g_now + 100, poll_sched_ready_ms(&S));
+}
+
+TEST_CASE("poll_sched: PRE, WRITE and VERIFY only count and occupy the bus", "[poll_sched]")
+{
+    static const ps_kind_t kinds[] = { PS_KIND_PRE, PS_KIND_WRITE, PS_KIND_VERIFY };
+    static const ps_res_t results[] = { PS_RES_OK, PS_RES_TIMEOUT, PS_RES_BAD_FRAME, PS_RES_ERROR, PS_RES_EXCEPTION };
+    ps_config_t c = base_cfg();
+    for (size_t k = 0; k < 3; k++) {
+        for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); i++) {
+            setup_running(&c);
+            finish(take(), PS_RES_OK, 0, DUR);   /* one normal poll first */
+            poll_sched_t before = S;
+            ps_req_t w = { .addr = 1, .reg = 231, .qty = 1, .kind = kinds[k] };
+            g_now += 200;
+            finish(w, results[i], 2 /* exception 02 must not mark 231 unsupported */, DUR);
+            TEST_ASSERT_EQUAL_INT(before.health, S.health);
+            TEST_ASSERT_EQUAL_UINT32(before.failures, S.failures);
+            TEST_ASSERT_FALSE(before.retry_pending != S.retry_pending);
+            TEST_ASSERT_EQUAL_MEMORY(before.unsupported, S.unsupported, sizeof(S.unsupported));
+            TEST_ASSERT_EQUAL_MEMORY(before.due_ms, S.due_ms, sizeof(S.due_ms));
+            TEST_ASSERT_FALSE(poll_sched_is_unsupported(&S, 231));
+            TEST_ASSERT_EQUAL_INT64(g_now + 100, poll_sched_ready_ms(&S));
+            ps_stats_t st;
+            poll_sched_get_stats(&S, &st);
+            TEST_ASSERT_EQUAL_UINT32(2, st.txns);
+            TEST_ASSERT_EQUAL_UINT32(kinds[k] == PS_KIND_PRE, st.pre);
+            TEST_ASSERT_EQUAL_UINT32(kinds[k] == PS_KIND_WRITE, st.write);
+            TEST_ASSERT_EQUAL_UINT32(kinds[k] == PS_KIND_VERIFY, st.verify);
+            TEST_ASSERT_EQUAL_UINT32(0, st.retries + st.manual + st.sweeps + st.health_probes);
+        }
+    }
+}
+
+TEST_CASE("poll_sched: failed write-sequence transactions never drive the health to OFFLINE", "[poll_sched]")
+{
+    setup_running(&(ps_config_t){ .addr = 1, .gap_ms = 100, .fast_ms = 5000, .slow_ms = 60000,
+                                  .offline_probe_ms = 30000, .retries = 1, .offline_after = 5 });
+    for (int i = 0; i < 20; i++) {
+        ps_req_t w = { .addr = 1, .reg = 201, .qty = 1, .kind = PS_KIND_VERIFY };
+        g_now += 200;
+        finish(w, PS_RES_TIMEOUT, 0, DUR);
+    }
+    TEST_ASSERT_EQUAL_INT(PS_ONLINE, poll_sched_health(&S));
+}

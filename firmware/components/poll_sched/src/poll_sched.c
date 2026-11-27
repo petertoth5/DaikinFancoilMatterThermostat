@@ -285,6 +285,9 @@ static void record_stats(poll_sched_t *s, const ps_txn_t *t)
     case PS_KIND_HEALTH: st->health_probes++; break;
     case PS_KIND_SWEEP:  st->sweeps++; break;
     case PS_KIND_MANUAL: st->manual++; break;
+    case PS_KIND_PRE:    st->pre++; break;
+    case PS_KIND_WRITE:  st->write++; break;
+    case PS_KIND_VERIFY: st->verify++; break;
     case PS_KIND_POLL:   break;
     }
     if (t->res != PS_RES_OK && t->res != PS_RES_EXCEPTION) {
@@ -311,7 +314,8 @@ static void record_stats(poll_sched_t *s, const ps_txn_t *t)
 /* Rule 6: exception 02 on a qty 1 POLL, RETRY, SWEEP or MANUAL read marks the register unsupported. */
 static void mark_unsupported_if_needed(poll_sched_t *s, const ps_txn_t *t)
 {
-    bool kind_ok = t->req.kind != PS_KIND_HEALTH;
+    bool kind_ok = t->req.kind == PS_KIND_POLL || t->req.kind == PS_KIND_RETRY ||
+                   t->req.kind == PS_KIND_SWEEP || t->req.kind == PS_KIND_MANUAL;
     if (!kind_ok || t->res != PS_RES_EXCEPTION || t->exc_code != EXC_ILLEGAL_ADDR || t->req.qty != 1) {
         return;
     }
@@ -406,6 +410,9 @@ void poll_sched_complete(poll_sched_t *s, const ps_txn_t *t)
     case PS_KIND_HEALTH: complete_health(s, t); break;
     case PS_KIND_SWEEP:
     case PS_KIND_MANUAL: break;   /* rule 10: no effect on counter, health or schedule */
+    case PS_KIND_PRE:
+    case PS_KIND_WRITE:
+    case PS_KIND_VERIFY: break;   /* write sequence: like MANUAL, and no unsupported mark either */
     }
     s->have_last = true;
     s->last_end_ms = t->t_end_ms;
@@ -422,6 +429,19 @@ bool poll_sched_is_unsupported(const poll_sched_t *s, uint16_t reg)
 {
     int i = index_of(reg);
     return i != NO_INDEX && s->unsupported[i];
+}
+
+uint8_t poll_sched_addr(const poll_sched_t *s)
+{
+    return s->cfg.addr;
+}
+
+int64_t poll_sched_ready_ms(const poll_sched_t *s)
+{
+    if (!s->have_last) {
+        return INT64_MIN;
+    }
+    return s->last_end_ms + (int64_t)s->cfg.gap_ms;
 }
 
 void poll_sched_get_stats(const poll_sched_t *s, ps_stats_t *out)

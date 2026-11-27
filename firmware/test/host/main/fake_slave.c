@@ -54,6 +54,18 @@ void fake_set_silent(fake_slave_t *f, uint16_t reg)
     reg_slot(f, reg)->mode = FAKE_REG_SILENT;
 }
 
+void fake_fail_request(fake_slave_t *f, uint32_t request_number)
+{
+    f->fail_at_request = request_number;
+}
+
+void fake_set_write(fake_slave_t *f, uint16_t reg, fake_write_mode_t mode, uint16_t arg)
+{
+    fake_reg_t *r = reg_slot(f, reg);
+    r->write_mode = mode;
+    r->write_arg = arg;
+}
+
 void fake_set_dead(fake_slave_t *f, int64_t from_ms, int64_t to_ms)
 {
     f->dead_from_ms = from_ms;
@@ -111,7 +123,8 @@ static bool in_dead_window(const fake_slave_t *f, int64_t now_ms)
 
 static bool is_scripted_failure(const fake_slave_t *f)
 {
-    return f->fail_every_n != 0 && f->request_count % f->fail_every_n == 0;
+    return (f->fail_every_n != 0 && f->request_count % f->fail_every_n == 0) ||
+           (f->fail_at_request != 0 && f->request_count == f->fail_at_request);
 }
 
 static fake_answer_t answer_from_regs(fake_slave_t *f, uint8_t addr, uint16_t reg, uint16_t qty, int64_t now_ms)
@@ -168,25 +181,30 @@ static fake_answer_t answer_from_replay(fake_slave_t *f, uint8_t addr, uint16_t 
     return a;
 }
 
-ps_res_t fake_link(void *ctx, uint8_t addr, uint16_t reg, uint16_t qty, uint16_t *val, uint8_t *exc)
+/* Common start of a request: bus rules, new journal entry. */
+static ps_txn_t *begin_request(fake_slave_t *f, uint8_t addr, uint16_t reg, uint16_t qty)
 {
-    fake_slave_t *f = ctx;
     TEST_ASSERT_TRUE_MESSAGE(addr >= ADDR_MIN && addr <= ADDR_MAX, "fake: request address outside 1..247");
-    TEST_ASSERT_TRUE_MESSAGE(daikin_regs_read_allowed(reg, qty), "fake: read of an undocumented register or qty outside 1..4");
     TEST_ASSERT_TRUE_MESSAGE(f->journal_n < FAKE_JOURNAL_MAX, "fake: journal full");
     if (f->journal_n > 0) {   /* the first request after init has no predecessor */
         TEST_ASSERT_GREATER_OR_EQUAL_INT64_MESSAGE(FAKE_DEFAULT_GAP_MS, *f->clock_ms - f->last_end_ms,
                                                    "fake: bus gap < 100 ms between two requests");
     }
-
     ps_txn_t *t = &f->journal[f->journal_n++];
     memset(t, 0, sizeof(*t));
     t->req.addr = addr;
     t->req.reg = reg;
     t->req.qty = qty;
     t->t_start_ms = *f->clock_ms;
-
     f->request_count++;
+    return t;
+}
+
+ps_res_t fake_link(void *ctx, uint8_t addr, uint16_t reg, uint16_t qty, uint16_t *val, uint8_t *exc)
+{
+    fake_slave_t *f = ctx;
+    TEST_ASSERT_TRUE_MESSAGE(daikin_regs_read_allowed(reg, qty), "fake: read of an undocumented register or qty outside 1..4");
+    ps_txn_t *t = begin_request(f, addr, reg, qty);
     fake_answer_t a = f->replaying ? answer_from_replay(f, addr, reg, qty)
                                    : answer_from_regs(f, addr, reg, qty, t->t_start_ms);
     *f->clock_ms += a.latency_ms;
@@ -200,6 +218,83 @@ ps_res_t fake_link(void *ctx, uint8_t addr, uint16_t reg, uint16_t qty, uint16_t
     *exc = a.exc_code;
     memcpy(val, a.val, qty * sizeof(uint16_t));
     return a.res;
+}
+
+/* ------------------------------------------------------------ FC06 */
+
+#define WRITABLE_REGS_N 3
+static const uint16_t k_writable_regs[WRITABLE_REGS_N] = { 201, 231, 233 };   /* spec 019 WR1 */
+
+static bool is_writable_reg(uint16_t reg)
+{
+    for (size_t i = 0; i < WRITABLE_REGS_N; i++) {
+        if (k_writable_regs[i] == reg) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* A register that would not answer a read (dead window, scripted failure, silent, exception, unset)
+ * does not answer a write either; otherwise the register's write script decides. */
+static fake_answer_t answer_write(fake_slave_t *f, uint16_t reg, uint16_t value, int64_t now_ms)
+{
+    fake_answer_t a = answer_from_regs(f, f->addr, reg, 1, now_ms);
+    if (a.res != PS_RES_OK) {
+        return a;
+    }
+    fake_reg_t *r = reg_slot(f, reg);
+    switch (r->write_mode) {
+    case FAKE_WRITE_OK:            r->raw = value; break;
+    case FAKE_WRITE_SILENT_LANDED: r->raw = value; return timeout_answer(f);
+    case FAKE_WRITE_SILENT_LOST:   return timeout_answer(f);
+    case FAKE_WRITE_EXC:           a.res = PS_RES_EXCEPTION; a.exc_code = (uint8_t)r->write_arg; break;
+    case FAKE_WRITE_BAD_ECHO:      r->raw = value; a.res = PS_RES_BAD_FRAME; break;
+    case FAKE_WRITE_CLAMP:         r->raw = r->write_arg; break;
+    }
+    return a;
+}
+
+ps_res_t fake_write(void *ctx, uint8_t addr, uint16_t reg, uint16_t value, uint8_t *exc)
+{
+    fake_slave_t *f = ctx;
+    TEST_ASSERT_TRUE_MESSAGE(is_writable_reg(reg), "fake: FC06 to a register outside {201, 231, 233}");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(f->addr, addr, "fake: FC06 to an address other than the slave's");
+    ps_txn_t *t = begin_request(f, addr, reg, 1);
+    t->req.kind = PS_KIND_WRITE;
+    f->write_count++;
+    fake_answer_t a = answer_write(f, reg, value, t->t_start_ms);
+    *f->clock_ms += a.latency_ms;
+    t->res = a.res;
+    t->exc_code = a.exc_code;
+    t->val[0] = value;
+    t->t_end_ms = *f->clock_ms;
+    f->last_end_ms = t->t_end_ms;
+    *exc = a.exc_code;
+    return a.res;
+}
+
+uint32_t fake_write_count(const fake_slave_t *f)
+{
+    return f->write_count;
+}
+
+void fake_check_write_spacing(const fake_slave_t *f)
+{
+    int64_t previous_start_ms = 0;
+    bool have_previous = false;
+    for (size_t i = 0; i < f->journal_n; i++) {
+        const ps_txn_t *t = &f->journal[i];
+        if (t->req.kind != PS_KIND_WRITE) {
+            continue;
+        }
+        if (have_previous) {
+            TEST_ASSERT_GREATER_OR_EQUAL_INT64_MESSAGE(FAKE_WRITE_MIN_SPACING_MS, t->t_start_ms - previous_start_ms,
+                                                       "fake: two FC06 frames < 5000 ms apart");
+        }
+        previous_start_ms = t->t_start_ms;
+        have_previous = true;
+    }
 }
 
 int64_t fake_clock(void *ctx)
