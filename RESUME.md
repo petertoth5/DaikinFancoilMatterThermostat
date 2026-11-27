@@ -5,7 +5,11 @@ Update after EVERY step. Keep short.
 ## Project
 Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout (bench + on-site phase-1 run, D23 amended 2026-11-27; MAX3485 3.3 V module for deployment), connecting to the Daikin EKWHCTRL1 **"A A B B -" Modbus RTU port** (nothing else connected there). Node = **sole Modbus master** (FC03 polling, FC06 only on Matter commands); staged phasing: 1 on-site read probe -> 2 Matter read-only mirror -> 3 Matter writes (write code compiled out until 3; **amended 2026-11-27, OS6 + W1–W14:** console-only writes in a separately built phase-1 write variant, task 019; Matter image write-free until phase 3). User decisions 2026-11-08. Knowledge in `Knowledgebase/wiki/` (agent-maintained, start at `index.md`), sources in `Knowledgebase/raw/`. Rules: root `CLAUDE.md`. Agents: `.claude/agents/README.md`.
 
-## Last step (2026-11-27)
+## Last step (2026-11-28)
+- **019b committed `f65f465`** after the B1-B4 review fixes (019a `2d8ec44`, amendments `0075304`). **Task 019 code complete.** Final `build-verifier` a-g all PASS: host tests 201/0/0 (mutation caught by m6b); read image 0x39eb0, no write symbols; write image 0x3c120, ELF write mode ok; Matter `check_no_bus` self-test 46 (was 38) and rejects the write ELF; Matter build ok; diffs limited; every checklist console string found in the sources. `firmware-reviewer` GO earlier.
+- Wiki not updated: task 019 goes into the wiki at acceptance, after the bench B.W run (S1).
+
+## Earlier (2026-11-27)
 - **019a committed `2d8ec44`** (host tests 200/0/0, A6 fix-up included); wiki fixes + spec 019 amendments A1-A10 committed `0075304`.
 - **019b implemented by `firmware-dev` (uncommitted):** `mb_link_write`, `bus_write` glue, `mb write` console (arm/disarm/sp/standby/fan/season/restore), write image via `sdkconfig.defaults.write` into `firmware/build_write` (run `set-target esp32s3` first, see `firmware/README.md`), A6 disarm hooks, P4 console-race reorder in phase-1 `main.c`, checklist B.W/E + log template, README.
 - **Reviews:** `build-verifier` all pass except old acceptance 7(d) (Matter never had a write FATAL); `firmware-reviewer` GO, no blocker/major.
@@ -34,6 +38,7 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout (be
 - S5: orchestrator batches open questions once per task; recommended defaults for minor items.
 
 ## Status / gates
+- **Task 019 code complete** (019a `2d8ec44`, 019b `f65f465`); acceptance pending the bench B.W run. **Trip image = write image** (expected boot header `fw=f65f465 ... writes=console`); it is not on the board yet.
 - **Phase 1 done; bench run done 2026-11-27** (R7 caveat: B.4.5/B.7 not conclusive). Phase-1 image is on the board. **On site unblocked with the MAX485-M** (D23 override, OS1-OS4) after the B.16 bench re-check with RO direct.
 - **Phase 2a:** code 015 `9dbace6`, 016 `03dacf5` (pushed); on device 2026-11-25 mostly pass (firmware-architecture section 7 "Phase-2a on-device run"). softAP fixed (017 `6b10c93`). Open: D6 factory reset + 017 D5 (guard line on the boot after reset); D7 Apple Home; O7 SetpointRaiseLower + D4 IM status code (chip-tool or `--log-level debug`); O9 idle 2 min (64 s seen); NVS free space. Provisional (a)/(b)/STAT items decided with the probe log (section 8).
 - **Phase 2b plan approved 2026-11-27:** 2b-A (bus stack + shared console + race fix, backport to phase-1 `main.c`) = spec 018, written, **paused 2026-11-27 (OS6)**, Part B (P4 backport) moved to 019 (W11), revise after the trip into a combined 2b+3 plan. 2b-B (real mapping + Fan EP2 read-only) and 2b-C (re-tune + Q-HW2 DE check via MCPWM capture) wait for the probe log in `raw/` + `/capture` and bus-topology items 1, 1b, 3, 4, 5.
@@ -41,14 +46,15 @@ Matter-over-Wi-Fi thermostat on ESP32-S3-WROOM-1-N16R8-M + MAX485-M breakout (be
 - Tooling note: subagents' read-only Bash calls are sometimes blocked after the RTK hook rewrite; fall back to the Read tool.
 
 ## Next
-1. **019b:** `firmware-dev` B1-B4 fixes done -> `build-verifier` checks a-g -> commit 019b.
-2. Bench (user): flash the write image (A/B open, module on 3.3 V, RO direct), run **B.W** (incl. B.W.7 stack >= 1024 B) + **B.16**. Image stays on the board for the trip.
-3. Trip: C, D.1-D.10 (disarmed), E control test, D.11; OS1-OS6 rules; disconnect A/B before re-flashing Matter (OS5). On site: read 247 to confirm the bit numbering. If 019b is not committed and bench-tested, the trip stays read-only.
-4. After the trip: probe log + capture to `Knowledgebase/raw/` (user; agents never write raw) + `/capture`, then the fewest-steps roadmap to production (revise 018 into a combined 2b+3 plan; 2b-B decides the 1000 Hz tick item).
+1. **Bench (user):** build + flash the write image with A/B open (module on 3.3 V, RO direct; commands in `firmware/README.md`):
+   `idf.py -B build_write -D SDKCONFIG=build_write/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.write" build`, then `idf.py -B build_write -p /dev/ttyACM0 flash`. Check header `fw=f65f465 ... writes=console`. Run checklist **B.W.1-B.W.8** (B.W.2 repeats B.16, so B.16 with the old image is optional; B.W.7 stack >= 1024 B). Image stays on the board for the trip.
+2. `wiki-keeper` records task 019 at acceptance (incl. A6 rule and B1-B4 under the console-write design, firmware-architecture).
+3. Trip: C, D.1-D.10 (disarmed), E control test, D.11; OS1-OS6 rules; disconnect A/B before re-flashing Matter (OS5). On site: read 247 to confirm the bit numbering. If B.W does not pass, the trip stays read-only.
+4. After the trip: probe log + capture to `Knowledgebase/raw/` (user; agents never write raw) + `/capture`, then the fewest-steps roadmap to production (combined 2b+3 plan revising 018; 2b-B decides the 1000 Hz tick item).
 5. Later on device (user, board only): Apple Home (D7), chip-tool O7 + D4 IM status code, O9 idle 2 min, O3 timing, reset-task stack, NVS free space; factory reset D6 + 017 D5 last.
 6. Deployment decisions open (BOM "to decide"); MAX3485 module per the buying criteria (D23).
 
 ## Start prompt (copy/paste into a fresh session in this repo; orchestrator is the default agent, else run `claude --agent orchestrator`)
 ```
-Read RESUME.md and CLAUDE.md, then continue the DaikinFancoilMatterThermostat project from "Next". Use the wiki (Knowledgebase/wiki/index.md) as the source of truth, ask me any open decisions (D1-D23 of v0.3, phase-2a 2a-1..10, 2b-P1..P10 and OS1-OS6 and W1-W14 are decided; console-write decisions W1-W14 and spec 019 (A1-A10, B1-B4) are approved, 019a is committed (2d8ec44), 019b is implemented but uncommitted: apply/verify the B1-B4 fix list, build-verifier checks a-g, then commit 019b and hand the bench B.W + B.16 run to the user, see tasks/019-probe-console-writes.md and Knowledgebase/wiki/concepts/firmware-architecture.md), and update RESUME.md after every step.
+Read RESUME.md and CLAUDE.md, then continue the DaikinFancoilMatterThermostat project from "Next". Use the wiki (Knowledgebase/wiki/index.md) as the source of truth, ask me any open decisions (D1-D23 of v0.3, phase-2a 2a-1..10, 2b-P1..P10 and OS1-OS6 and W1-W14 are decided; console-write decisions W1-W14 and spec 019 (A1-A10, B1-B4) are approved, task 019 is code complete (019a 2d8ec44, 019b f65f465, build-verifier a-g PASS): first ask me for the bench B.W.1-B.W.8 results with the write image (header fw=f65f465 ... writes=console), then have wiki-keeper record 019 at acceptance and prepare the trip (C, D.1-D.10, E, D.11), see tasks/019-probe-console-writes.md and Knowledgebase/wiki/concepts/firmware-architecture.md), and update RESUME.md after every step.
 ```
