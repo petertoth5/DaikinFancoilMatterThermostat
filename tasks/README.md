@@ -48,6 +48,15 @@ Gate amendment (user decision 2026-11-24, wiki architecture sec. 6 "Working mode
 
 Order: 015 (step 0 is a stop condition: esp_matter from the registry only) -> 016 -> feature review.
 
+## Phase 2b and OS6 control test (user decisions 2026-11-27)
+Gate exceptions: 2b-P1 (2b-A before the probe log, bench only with A/B open) and W2 (019 specified and built before the probe log; on-site writes gated at run time and by checklist E.0). Wiki: architecture sec. 6 "Phase-2b plan" and OS6.
+
+| # | Task | Depends on | Model | Bus-touching | Status |
+|---|---|---|---|---|---|
+| 018 | [Bus stack in the Matter image, read-only, shared console (2b-A)](018-bus-in-matter-readonly.md) | 006, 011, 014, 015, 016, 017 | sonnet | yes | spec written 2026-11-27, **paused** (OS6); Part B (P4 backport) moved to 019 (W11); to be revised after the trip as part of a combined 2b+3 task set |
+| 019a | [Console writes, pure part: FC06 codec, `write_guard`, poll_sched kinds, fake slave, lint/ELF modes](019-probe-console-writes.md) | 010, 011, 012, 013 | sonnet | yes (write logic, lint) | spec ready 2026-11-27 (W1-W14); `build-verifier` after the pass |
+| 019b | [Console writes, target part: `mb_link_write`, `bus_write`, `mb write` console, write build variant, P4 race backport, checklist B.W/E](019-probe-console-writes.md) | 019a, 006, 014 | sonnet | yes (first FC06 TX code) | spec ready 2026-11-27; then `build-verifier` + full `firmware-reviewer` review of 019a+019b; bench B.W + B.16 before the trip |
+
 ## Retired (files kept as short notes so numbering and history stay clear)
 - 002 esp-modbus master spike / `mb_link` (2026-11-24, user decision E2 on escalation S3) -> replaced by 012 (`mb_rtu`), 013 (lint + ELF check), 014 (`rs485_port` + `mb_link`); spike evidence in `docs/spikes/002-esp-modbus.md`; the esp-modbus route survives only as the documented fallback E1b in 014 (amended 2026-11-24, user decision)
 - 003 `rtu_sniff` (v0.3, 2026-11-08) -> was replaced by 002, now by 012/014
