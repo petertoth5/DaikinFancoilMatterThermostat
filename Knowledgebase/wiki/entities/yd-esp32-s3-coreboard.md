@@ -28,7 +28,7 @@ Dev board (VCC-GND studio, schematic dated 2022/6/1, revision "*") carrying the 
 - WS2812B RGB LED on **GPIO48** via 0 Ω "RGB".
 - BOOT switch GPIO0 -> GND + 100 nF (no external pull-up; the module's weak pull-up applies, [[sources/esp32-s3-wroom-1-datasheet]] PDF p14). RST switch CHIP_PU -> GND + 100 nF; EN 10 kΩ / 1 µF.
 - TX1 / RX1 blue LEDs on U0TXD / U0RXD (680 Ω to VDD33).
-- No other GPIO pull resistors; GPIO4/5/6 go only to J1-4/5/6, so the bus defaults TX 5 / RX 4 / DE 6 have no on-board load.
+- No other GPIO pull resistors; GPIO4/5/6 go only to J1-4/5/6, so the bus defaults TX 5 / RX 4 / DE 6 have no on-board load. Their reset state (high-Z, no internal pulls) is external, user-reported and unverified (2026-11-28), see [[entities/esp32-s3-wroom-1]].
 
 ## Hazards
 - GPIO35/36/37 are on J2-13/12/11 but are wired to the octal PSRAM on an R8 module and must not be used ([[sources/esp32-s3-wroom-1-datasheet]] PDF p13 fn b).

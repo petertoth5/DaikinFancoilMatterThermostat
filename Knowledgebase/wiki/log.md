@@ -502,3 +502,9 @@ No raw files added or changed. Source: user observation of the physical board, s
 - entities/yd-esp32-s3-coreboard: printed board name "ESP32-S3-N16R8" recorded (not "YD-ESP32-S3-COREBOARD", no "-M"); neutral evidence, board identity stays inferred (Hestore 10048120 + empty IN-OUT bridge, COM/USB labels, CH343 console). Open question "board name printed" answered.
 - entities/esp32-s3-wroom-1: "-M" section gets the data point (no "-M" on the PCB print); conflict with the project brief left open.
 - index.md: yd-esp32-s3-coreboard and esp32-s3-wroom-1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | external evidence: GPIO4/5/6 reset state high-Z
+No raw files added or changed. Source: user's internet search, session 2026-11-28, no source document in raw; recorded as external, user-reported, unverified.
+- concepts/firmware-architecture s8: open item "reset pull state of GPIO4/5/6" kept open; evidence added (high-Z, input buffer / output driver / internal pulls disabled during and right after reset), noted as consistent with the D8 / OS2 assumption (GPIO6 floats, DE ≈ 2.2 V until `mb_link_hold_receive`), GPIO4 held by the external 20 kΩ pull-up, GPIO5 by the module's DI pull-up *(inferred)*. Confirmation needs the ESP32-S3 series datasheet IO MUX reset-state table in raw.
+- entities/esp32-s3-wroom-1 ("Not stated" item) and entities/yd-esp32-s3-coreboard (GPIO pulls line): short notes added.
+- index.md unchanged (summaries still accurate). Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
