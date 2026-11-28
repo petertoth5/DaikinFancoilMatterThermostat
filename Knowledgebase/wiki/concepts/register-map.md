@@ -117,6 +117,10 @@ Source: session observation, not in raw (user's `mb regs` output and panel readi
 - **Standby on/off:** both directions seen in 201 bit 7 (and 104 bit 11): [[concepts/flag-registers]] "Standby transition observed".
 - **End state of D.7 (user):** ON, heating (233 = 3), fan high (201 = 3), setpoint 22.0 = the D.7 start state.
 
+### Production use (user decisions 2026-11-28, combined 2b+3 plan PR1–PR5, not in raw)
+Polled set in the production Matter image: fast 5 s 000, 008, 104, 201, 231, 233; slow 60 s 105, 202, 203, 245, 246, 247; 001 / 009 dropped after their first exception 02 (both answered exception 02 in D.3 above); block read 200–203 deferred. Setpoint writes go to 231 only (008 diagnostic), rounded to 0.5 °C; limits [202, 203] ∩ [245, 246 if 247 bit 5] ∩ [5, 40] °C, today 16.0–28.0. 233 = 0 is never written from Matter. Details and the full decision list: [[concepts/firmware-architecture]] sections 5 and 6 "Combined 2b+3 plan".
+Read-image D.8 counters (txns 3933, 0.1 % error rate, 4 BADFRAMEs all on 000) and the `gap_bytes` analysis: [[concepts/firmware-architecture]] section 7 "On-site D.8 read-image result".
+
 - Writing the setpoint: p6 "To enter the setpoint, write the absolute value within the selected scale in register 231 SP."; 008 is the read-only real setpoint.
 - PRG 201 legend (p5, image-verified 2026-11-27): "PRG: 000=Sutomatic; 001=Silent; 010=Night; 011=Maximum" (printed typo "Sutomatic"), LOCK, Stby; bits 3, 5, 6 printed "-" with no legend; "8-15: System Flags reserved, do not change the status" ([[concepts/flag-registers]]).
 - Reg 231 Note 2 (p4): "Absolute setpoint value from 5 to 40. For the setpoint, write the value within the selected scale." Behaviour on an out-of-range write (refused, clamped, exception?) is **not stated**.

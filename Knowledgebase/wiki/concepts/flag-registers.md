@@ -105,6 +105,7 @@ Source: session observation, not in raw (user's panel reading and `mb read 201 1
 - **Fan button cycle:** high -> low -> auto -> high only (user: "no other option"). Night (2) is **not** in the fan-button cycle.
 - **Comparison with p5** (000 Automatic, 001 Silent, 010 Night, 011 Maximum): bit values for auto (0) and night (2) match the printed names; 1 and 3 match **if** "Silent" = displayed "low" and "Maximum" = displayed "high" *(inferred naming match, not stated in p5)*. Recorded, not resolved further.
 - Not observed: values 100–111 (p5 undefined); whether a write of 2 (night) behaves like the panel's night control (no writes on this trip).
+- **Use in the Matter mapping (user decision 2026-11-28, PR3, not in raw):** Low = 001, High = 011, Auto = 000; night (010) is read as Low with a console flag; codes 4–7 keep the last value. Details: [[concepts/firmware-architecture]] section 5 EP2 / section 6 "Combined 2b+3 plan".
 - **Restore night -> high (D.7):** `T 1092210 122 1 MANUAL 201 1 OK 0003`. POLL 201 (local inspection): `0002` -> `0000` (auto) at ≈ 1040.8 s, then `0003` at ≈ 1085.8 s. Which control set and cleared night: still not stated by the user.
 
 ### Season and STAT bit 1 (on site 2026-11-28, D.7)
