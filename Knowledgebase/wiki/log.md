@@ -508,3 +508,79 @@ No raw files added or changed. Source: user's internet search, session 2026-11-2
 - concepts/firmware-architecture s8: open item "reset pull state of GPIO4/5/6" kept open; evidence added (high-Z, input buffer / output driver / internal pulls disabled during and right after reset), noted as consistent with the D8 / OS2 assumption (GPIO6 floats, DE ≈ 2.2 V until `mb_link_hold_receive`), GPIO4 held by the external 20 kΩ pull-up, GPIO5 by the module's DI pull-up *(inferred)*. Confirmation needs the ESP32-S3 series datasheet IO MUX reset-state table in raw.
 - entities/esp32-s3-wroom-1 ("Not stated" item) and entities/yd-esp32-s3-coreboard (GPIO pulls line): short notes added.
 - index.md unchanged (summaries still accurate). Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site wiring: external 20 kΩ GPIO4 pull-up removed
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw), relayed by the orchestrator.
+- concepts/firmware-architecture: s4 "On-site phase-1 wiring" bullet and s6 OS4 row amended (old text kept): diode **and** the external 2 × 10 kΩ (20 kΩ) pull-up GPIO4 -> 3.3 V removed; RO direct to GPIO4; only external resistor = single 10 kΩ DE + /RE pull-down (GPIO6); deviation from OS4 accepted by the user. Module RO pull-up R1 (10 kΩ to VCC 3.3 V, B.2) likely makes the external one redundant *(inferred, unverified)*; check = B.16 on site with A/B open before connecting, result pending. s8 GPIO4/5/6 reset-state item: GPIO4 hold note amended.
+- entities/max485: on-site wiring line amended likewise.
+- index.md: max485 summary. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/` (checklist B.16 / OS4 text in `docs/` not edited). Not committed.
+
+## [2026-11-28] sync | on-site B.16 PASS (RO direct, no external 20 kΩ pull-up)
+No raw files added or changed. Source: user's console output on site, session 2026-11-28 (not in raw; capture being saved as `docs/phase1-probe/site-2026-11-28.log`, to go to raw after the trip).
+- concepts/firmware-architecture: s4 "On-site phase-1 wiring" amendment gets the B.16 result (old "result pending" struck); s6 OS4 row likewise; s7 new "On-site B.16 2026-11-28" result line (read image `6654669-dirty`, activity 0, OFFLINE, txns 12 all timeout, bad_frame 0, `gap_bytes` 0, faults 0, stack min free 2768 B, one boot, idf_monitor checksum-mismatch warning harmless). Redundancy of the external pull-up now supported for the static / idle case, still *(inferred)* for live-bus behaviour (D.3+).
+- entities/max485: on-site wiring line gets the B.16 result.
+- index.md: firmware-architecture and max485 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site checklist C.1–C.4 at "A A B B -"
+No raw files added or changed. Source: user measurements on site, session 2026-11-28 (not in raw; to go to raw with the filled measurement log after the trip), relayed by the orchestrator.
+- concepts/firmware-architecture: s7 new "On-site C.1–C.4 2026-11-28" entry (C.1 photos; C.2 A–A / B–B continuous; C.3 A–B ≈ 135 kΩ -> no panel termination *(inferred)*, R7 only, no STOP, C3.cp skipped (A.2); C.4 node GND to "-"/A/B 0 V, panel "-"→B −2.2 V, "-"→A −0.9 V, A–B −1.26 V). s8: termination/bias item amended; new open item D.1 polarity (panel A likely inverting, *inferred*, not decided). Checklist C.3 vs A.2 inconsistency noted as an open item (docs/ not edited).
+- concepts/bus-topology: new "On-site measurements" section; items 3, 5, 7 amended.
+- entities/ekwhctrl1: port measurements; open questions (d), (e) amended.
+- concepts/modbus-rs485-link: one line linking the polarity observation to the legend conflict (not resolved).
+- index.md: bus-topology, firmware-architecture, modbus-rs485-link, ekwhctrl1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site C.5 address 01, D.1 crossed wiring, node GND unconnected
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw), relayed by the orchestrator; wiring and GND are user decisions (orchestrator proposed crossed, user chose, "for now, let's see").
+- concepts/firmware-architecture: s7 new "On-site C.5 / D.1 2026-11-28" entry (C.5 panel address = 01, matches `addr=1`, no `mb addr`; D.1 crossed: module A -> panel "B", module B -> panel "A"; fallback straight via the D.4 procedure, order reversed, a reordering of D.4, not a new rule; node GND not connected to "-"); old "Next" line struck. s8 polarity item: decided for the first attempt (crossed), outcome pending.
+- concepts/bus-topology: on-site section (C.5, D.1 polarity, node GND) and item 5 amended.
+- entities/ekwhctrl1: this-installation entry (address 01, wiring); open question (e) amended.
+- concepts/device-addressing: this-installation line (address 01); `updated` bumped.
+- index.md: bus-topology, firmware-architecture, device-addressing, ekwhctrl1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.1 result / D.2: panel answers with crossed wiring
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; console captures `docs/phase1-probe/site-2026-11-28.log` and `site-2026-11-28-d.log`, project files, to go to raw after the trip), relayed by the orchestrator.
+- concepts/firmware-architecture: s7 new "On-site D.1 result / D.2" entry (crossed wiring, node GND unconnected: panel answers FC03 at address 1, 9600 8N1; first wired boot's silence line not captured (hidden idf_monitor reconnected at ≈ 25 s), 103 OK lines after; monitor reopen reset the board (A.6); D.2 `mb status`: ONLINE, activity 0, dropped 0, stack min free 2768 B, `gap_bytes` 0, `max_byte_interval_us` 1046, faults 0; raw poll values; `dur_ms` 120–130; panel normal). s8 polarity item resolved for this installation (crossed works; legend reading still inferred).
+- concepts/bus-topology: on-site "First answers" bullet; items 1, 1b, 5 answered / amended.
+- entities/ekwhctrl1: answers at 01 on "A A B B -", crossed; open questions (b), (e) amended.
+- concepts/device-addressing: address 01 confirmed by bus reply.
+- concepts/register-map: new "First live values" section (session observation; scaled values derived; 104 / 201 not decoded).
+- index.md: bus-topology, register-map, firmware-architecture, device-addressing, ekwhctrl1 summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.3 register sweep (`mb probe`, `mb regs`)
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; capture `docs/phase1-probe/site-2026-11-28-d.log`, project file, to go to raw after the trip), relayed by the orchestrator. Crossed wiring, address 1, FC03 qty 1.
+- concepts/register-map: "First live values" rewritten as the full D.3 table (25 OK with raw/scaled, 7 exception 02: 001, 009, 015, 230, 234, 243, 244; no TIMEOUT / BADFRAME; `dur_ms` 120–130); printed-default comparison; star inference marked partly contradicted; **conflict** recorded: unstarred 230/234 raise exception 02. 218 LLO 30.0 > 219 LHI 20.0 recorded as observed.
+- concepts/flag-registers: new "Observed values" section (104 `8802`, 105 `0000`, 201 `0083`, 009 exception 02), decoding derived from the p5 tables (bit 0 = LSB); **conflict** recorded: 104 bit 15 = 1 vs printed "0"; open items amended.
+- concepts/web-restriction-flags: 247 = 0 observed; bit numbering still unconfirmed (needs a set flag).
+- concepts/firmware-architecture: s7 new "On-site D.3" entry (exit item 4 answered, W14 register part OK, D.4 not needed, next D.5); old "Next: D.3" struck.
+- concepts/bus-topology: on-site "Register sweep" bullet; item 4 answered.
+- index.md: register-map, flag-registers, web-restriction-flags, firmware-architecture, bus-topology summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.5 FC03 qty > 1 (block reads)
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; capture `docs/phase1-probe/site-2026-11-28-d.log`, project file, to go to raw after the trip), relayed by the orchestrator. Crossed wiring, address 1.
+- concepts/register-map: new "Block reads (D.5)" subsection (200 qty 4 OK `0001 0083 00a0 0118` = single reads, `dur_ms` 127; 000 qty 2 and 242 qty 4 exception 02 as a whole; standard Modbus behaviour marked external; 2b block-read consequence inferred).
+- concepts/bus-topology: on-site "Block reads" bullet; item 1b qty > 1 answered (FC06 still open).
+- concepts/firmware-architecture: s7 new "On-site D.5" entry (exit item 5 answered, 2b mapping note, panel normal, polling OK, next D.6 / D.7); old "Next: D.5" struck; s8 "FC03 qty > 1 unknown" struck and answered.
+- index.md: bus-topology, register-map, firmware-architecture summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.6, D.7 partial (standby -> on, setpoint up), one BADFRAME
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; capture `docs/phase1-probe/site-2026-11-28-d.log`, project file, to go to raw after the trip), relayed by the orchestrator; poll lines 104/201 at 450–461 s and the BADFRAME/RETRY pair spot-checked by local inspection of the capture; checklist D.8 / D.8a wording checked by local inspection of `docs/phase1-probe/checklist.md`.
+- concepts/flag-registers: new "Standby transition observed" subsection (104 `8802` -> `8002`, 201 `0083` -> `0003` together at ≈ 455 s with the user's switch-on; 201 bit 7 and 104 bit 11 = standby confirmed by observation, bit 0 = LSB; 201 bits 0–2 = 3 with high fan, one data point; keypress time not timed); D.3 standby question answered; open item for fan order / on -> standby.
+- concepts/register-map: new "Local keypress correlation (D.7)" subsection (setpoint up -> 008 and 231 both `0x00E1` = 22.5; T1 drift 18.0 -> 18.3).
+- concepts/firmware-architecture: s7 new "On-site D.6 / D.7 (partial)" entry (exit item 9: nothing new, no WEB icon; start state ON / high fan / 22; standby -> on; setpoint up; one BADFRAME `T 460072` + RETRY OK, recorded not a STOP per D.8 / D.8a; capture-file lag tooling note); D.3 panel-state line answered; old "Next: D.6, D.7" struck.
+- concepts/bus-topology: on-site bullet for D.6 / D.7 partial and the BADFRAME; section heading extended.
+- concepts/web-restriction-flags: flag 0 row, no WEB icon while polled with 247 = 0.
+- index.md: flag-registers, register-map, bus-topology, web-restriction-flags, firmware-architecture summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.7 setpoint down and fan modes (201 bits 0–2)
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; capture `docs/phase1-probe/site-2026-11-28-d.log`, project file, to go to raw after the trip), relayed by the orchestrator (POLL 201 change times and MANUAL read times as read from the capture by the orchestrator).
+- concepts/flag-registers: new "Fan mode observed" subsection (201 = 3 high, 1 low, 0 auto via fan button; 2 night via a different, unspecified control; fan button cycles high -> low -> auto -> high only; p5 names match if Silent = low and Maximum = high, inferred); fan-order open item closed; night control added as open.
+- concepts/register-map: setpoint down 22.5 -> 22.0, 008 / 231 `0x00DC`; both follow local changes in 0.5 °C steps; 233 `0x0003` at ≈ 941 s.
+- concepts/firmware-architecture: s7 new "On-site D.7 setpoint down + fan modes" entry incl. note for the EP2 fan mapping (4 values, panel cycle only 3; s5 EP2 plan Night -> Low / Silent -> Medium differs from the panel labels, recorded for the architect, s5 not changed); polling OK apart from the BADFRAME at 460072.
+- index.md: register-map, flag-registers, firmware-architecture summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.
+
+## [2026-11-28] sync | on-site D.7 complete (fan restore, season 233, standby both directions)
+No raw files added or changed. Source: user on site, session 2026-11-28 (not in raw; capture `docs/phase1-probe/site-2026-11-28-d.log`, project file, to go to raw after the trip), MANUAL lines relayed by the orchestrator; POLL 104 / 201 / 233 / 000 and H lines checked by local inspection of the capture.
+- concepts/register-map: keypress section marked complete; 233 observed 3 = heating, 5 = cooling (Italian reading inferred, 0 not observed); cooling duration user ≈ 1.5–2 min vs capture ≈ 65–75 s (discrepancy recorded); fan night -> high; end state ON / heating / high / 22.0; 233 notes bullet amended.
+- concepts/flag-registers: standby both directions (201 bit 7; 104 bit 11 follows in both directions per capture, relay said first only: recorded); night -> high restore; new "Season and STAT bit 1" (104 bit 1 cleared while 233 = 5); on -> standby open item closed.
+- concepts/firmware-architecture: s7 new "On-site D.7 complete" entry (exit item 8 answered; 2 more BADFRAMEs found in the capture at 1225072 (+ failed RETRY, DEGRADED -> ONLINE) and 1360072 (RETRY OK), all 3 on reg 000 ≈ 4–5 s after a panel state change, pattern inferred; next D.8 with snapshot schedule deviation: now ≈ 22 min and ≥ 60 min after boot, cumulative counters).
+- index.md: register-map, flag-registers, firmware-architecture summaries. Not changed: `raw/`, `firmware/`, `tasks/`, `docs/`. Not committed.

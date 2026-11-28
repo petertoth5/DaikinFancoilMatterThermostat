@@ -2,7 +2,7 @@
 title: WEB supervisor flags (register 247)
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf"]
-updated: 2026-11-27
+updated: 2026-11-28
 ---
 
 # WEB flags – reg 247 (R/W)
@@ -13,11 +13,11 @@ For webserver/supervisor control of the panel (p6: "For the interaction with a w
 
 **Persistence (p6, exact):** "If the power supply is cut off, the data is maintained. The selections carried out by the user are maintained if the power supply is cut off, except for "FLAG 7" that will be deleted." Ambiguous whether "the data" covers only reg 247 or also other registers (231, 233, 201...); not stated. The manual says nothing about EEPROM storage, write endurance or a permitted write rate for 231 / 233 / 201 (or 247).
 
-**Bit numbering:** the manual labels the rows "FLAG n (247.n)" and never uses the words "bit" or "LSB". FLAG n = bit n with bit 0 = LSB is ***inferred*** (confidence medium-high): consistent with the p5 bit tables, which number bits 0–15 ([[concepts/flag-registers]]). To confirm on site by reading 247.
+**Bit numbering:** the manual labels the rows "FLAG n (247.n)" and never uses the words "bit" or "LSB". FLAG n = bit n with bit 0 = LSB is ***inferred*** (confidence medium-high): consistent with the p5 bit tables, which number bits 0–15 ([[concepts/flag-registers]]). To confirm on site by reading 247. **2026-11-28 (D.3, session observation, not in raw):** 247 read `0x0000` (all flags 0, no supervisor restriction set; value equals the printed default 0). This **does not confirm** the numbering (every numbering reads 0 when no flag is set); confirmation still needs a read with a flag set. **Still open.** Live values: [[concepts/register-map]] "First live values".
 
 | Flag | Function (printed) | Effect (printed / summary) |
 |---|---|---|
-| 0 | "Led WEB OFF" | "If = 1, the ⚠ icon is always set to off" (the icon is printed as a symbol; reading it as the "WEB icon" is an interpretation *(inferred)*) |
+| 0 | "Led WEB OFF" | "If = 1, the ⚠ icon is always set to off" (the icon is printed as a symbol; reading it as the "WEB icon" is an interpretation *(inferred)*). **On site 2026-11-28 (D.6, user, not in raw):** with 247 = 0 and polling running, the panel showed nothing new, no WEB icon ([[concepts/firmware-architecture]] section 7) |
 | 1 | Forced off | Machine off, user cannot switch it on. Row printed "FLAG 1 **(247.0)**" in **both** files (confirmed on the image 2026-11-27); typo for 247.1 *(inferred)* |
 | 2 | Disables the rotation of the programmes | User cannot change the program |
 | 3 | Disables select/deselect of the stby function | User cannot switch the unit on and off |

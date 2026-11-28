@@ -2,7 +2,7 @@
 title: Modbus RTU / RS485 link
 type: concept
 sources: ["EKWHCTRL0.EKWHCTRL1.EKRTCTRL1_Installation manual_N420384A_English.pdf", "EKWHCTRL1,EKRTCTRL1,EKWHCTRL0_Installation manual_N420384A ModBus RTU_English.pdf", "MAX485-M_EN_10035508.pdf"]
-updated: 2026-11-27
+updated: 2026-11-28
 ---
 
 # Modbus RTU / RS485 link
@@ -14,7 +14,7 @@ updated: 2026-11-27
 
 **Conflict – EKRTCTRL1 terminal legend (unresolved source conflict):** in the EKRTCTRL1 legend row "ModBus RTU serial connection" (p2), [[sources/n420384a-english]] prints "+AB-" and [[sources/n420384a-modbus-rtu]] prints "+BA-". In both files the p2 PCB plug and wire labels print "+ A B -" (visually verified by `datasheet-reader`). EKRTCTRL1 is not installed here.
 **EKWHCTRL1: no conflict.** Both files print "+ A B -" (and "A A B B -") for EKWHCTRL1 (p3, visually verified), and the user confirmed the "+ A B -" label on the hardware (session 2026-11-07, not in raw). Port roles: "+ A B -" = serial connection for fancoil, "A A B B -" = Modbus RTU ([[entities/ekwhctrl1]]). Whether the "+ A B -" fancoil link runs Modbus RTU 9600 8N1 is likely but unverified *(inferred)*, see [[concepts/bus-topology]].
-**Open – A/B electrical mapping:** how Daikin "A"/"B" map to MAX485 A (non-inverting) / B (inverting) ([[sources/max485-datasheet]] p7) is still to verify by measurement or sniffing *(inferred)*.
+**Open – A/B electrical mapping:** how Daikin "A"/"B" map to MAX485 A (non-inverting) / B (inverting) ([[sources/max485-datasheet]] p7) is still to verify by measurement or sniffing *(inferred)*. **2026-11-28 on-site observation (user, not in raw):** the panel's idle "A A B B -" line has B ≈ 1.26 V above A, so the panel's "A" is likely the inverting line *(inferred)*, a pattern that would fit the "+BA-" print in the legend conflict above, though that conflict concerns EKRTCTRL1, not EKWHCTRL1 *(inferred link, not resolved)*; D.1 polarity pending ([[concepts/firmware-architecture]] section 8, [[concepts/bus-topology]] item 5).
 
 **Conflict/gap – 500 m/50 units:** missing from file 2; treat as valid but unconfirmed there.
 
